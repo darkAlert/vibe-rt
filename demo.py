@@ -65,8 +65,10 @@ def main(args):
     if not os.path.isfile(video_file):
         exit(f'Input video \"{video_file}\" does not exist!')
 
-    output_path = os.path.join(args.output_folder, os.path.basename(video_file).replace('.mp4', ''))
-    os.makedirs(output_path, exist_ok=True)
+    # making output to the same directory
+    #output_path = os.path.join(args.output_folder, os.path.basename(video_file).replace('.mp4', ''))
+    #os.makedirs(output_path, exist_ok=True)
+    os.makedirs(args.output_folder, exist_ok=True)
 
     image_folder, num_frames, img_shape = video_to_images(video_file, return_info=True)
 
@@ -80,7 +82,7 @@ def main(args):
     if args.tracking_method == 'pose':
         if not os.path.isabs(video_file):
             video_file = os.path.join(os.getcwd(), video_file)
-        tracking_results = run_posetracker(video_file, staf_folder=args.staf_dir, display=args.display)
+        tracking_results = run_posetracker(video_file, staf_folder=args.staf_dir, display=True) # args.display
     else:
         # run multi object tracker
         mot = MPT(
@@ -105,6 +107,7 @@ def main(args):
         hidden_size=1024,
         add_linear=True,
         use_residual=True,
+        # use_6d=False, # for alternative prediction, doesn't work(((
     ).to(device)
 
     # ========= Load pretrained weights ========= #
@@ -130,6 +133,10 @@ def main(args):
 
         frames = tracking_results[person_id]['frames']
 
+        # debug
+        #print("frames shape = " + str(frames.shape))
+        #print(frames)
+
         dataset = Inference(
             image_folder=image_folder,
             frames=frames,
@@ -147,6 +154,7 @@ def main(args):
         with torch.no_grad():
 
             pred_cam, pred_verts, pred_pose, pred_betas, pred_joints3d, norm_joints2d = [], [], [], [], [], []
+            pred_joints2d, rotmat = [], []
 
             for batch in dataloader:
                 if has_keypoints:
@@ -164,6 +172,8 @@ def main(args):
                 pred_pose.append(output['theta'][:,:,3:75].reshape(batch_size * seqlen, -1))
                 pred_betas.append(output['theta'][:, :,75:].reshape(batch_size * seqlen, -1))
                 pred_joints3d.append(output['kp_3d'].reshape(batch_size * seqlen, -1, 3))
+                pred_joints2d.append(output['kp_2d'].reshape(batch_size * seqlen, -1, 2))
+                rotmat.append(output['rotmat'].reshape(batch_size * seqlen, -1, 3, 3))  
 
 
             pred_cam = torch.cat(pred_cam, dim=0)
@@ -171,43 +181,45 @@ def main(args):
             pred_pose = torch.cat(pred_pose, dim=0)
             pred_betas = torch.cat(pred_betas, dim=0)
             pred_joints3d = torch.cat(pred_joints3d, dim=0)
+            
+            pred_joints2d = torch.cat(pred_joints2d, dim=0)
+            rotmat = torch.cat(rotmat, dim=0)
 
             del batch
 
         # ========= [Optional] run Temporal SMPLify to refine the results ========= #
         if args.run_smplify and args.tracking_method == 'pose':
-            norm_joints2d = np.concatenate(norm_joints2d, axis=0)
-            norm_joints2d = convert_kps(norm_joints2d, src='staf', dst='spin')
-            norm_joints2d = torch.from_numpy(norm_joints2d).float().to(device)
+           norm_joints2d = np.concatenate(norm_joints2d, axis=0)
+           norm_joints2d = convert_kps(norm_joints2d, src='staf', dst='spin')
+           norm_joints2d = torch.from_numpy(norm_joints2d).float().to(device)
 
-            # Run Temporal SMPLify
-            update, new_opt_vertices, new_opt_cam, new_opt_pose, new_opt_betas, \
-            new_opt_joints3d, new_opt_joint_loss, opt_joint_loss = smplify_runner(
-                pred_rotmat=pred_pose,
-                pred_betas=pred_betas,
-                pred_cam=pred_cam,
-                j2d=norm_joints2d,
-                device=device,
-                batch_size=norm_joints2d.shape[0],
-                pose2aa=False,
-            )
+           # Run Temporal SMPLify
+           update, new_opt_vertices, new_opt_cam, new_opt_pose, new_opt_betas, \
+           new_opt_joints3d, new_opt_joint_loss, opt_joint_loss = smplify_runner(
+               pred_rotmat=pred_pose,
+               pred_betas=pred_betas,
+               pred_cam=pred_cam,
+               j2d=norm_joints2d,
+               device=device,
+               batch_size=norm_joints2d.shape[0],
+               pose2aa=False,
+           )
 
-            # update the parameters after refinement
-            print(f'Update ratio after Temporal SMPLify: {update.sum()} / {norm_joints2d.shape[0]}')
-            pred_verts = pred_verts.cpu()
-            pred_cam = pred_cam.cpu()
-            pred_pose = pred_pose.cpu()
-            pred_betas = pred_betas.cpu()
-            pred_joints3d = pred_joints3d.cpu()
-            pred_verts[update] = new_opt_vertices[update]
-            pred_cam[update] = new_opt_cam[update]
-            pred_pose[update] = new_opt_pose[update]
-            pred_betas[update] = new_opt_betas[update]
-            pred_joints3d[update] = new_opt_joints3d[update]
+           # update the parameters after refinement
+           print(f'Update ratio after Temporal SMPLify: {update.sum()} / {norm_joints2d.shape[0]}')
+           pred_verts = pred_verts.cpu()
+           pred_cam = pred_cam.cpu()
+           pred_pose = pred_pose.cpu()
+           pred_betas = pred_betas.cpu()
+           pred_verts[update] = new_opt_vertices[update]
+           pred_cam[update] = new_opt_cam[update]
+           pred_pose[update] = new_opt_pose[update]
+           pred_betas[update] = new_opt_betas[update]
+           pred_joints3d[update] = new_opt_joints3d[update].cuda()
 
         elif args.run_smplify and args.tracking_method == 'bbox':
-            print('[WARNING] You need to enable pose tracking to run Temporal SMPLify algorithm!')
-            print('[WARNING] Continuing without running Temporal SMPLify!..')
+           print('[WARNING] You need to enable pose tracking to run Temporal SMPLify algorithm!')
+           print('[WARNING] Continuing without running Temporal SMPLify!..')
 
         # ========= Save results to a pickle file ========= #
         pred_cam = pred_cam.cpu().numpy()
@@ -215,7 +227,9 @@ def main(args):
         pred_pose = pred_pose.cpu().numpy()
         pred_betas = pred_betas.cpu().numpy()
         pred_joints3d = pred_joints3d.cpu().numpy()
-
+        pred_joints2d = pred_joints2d.cpu().numpy()
+        rotmat = rotmat.cpu().numpy()
+ 
         orig_cam = convert_crop_cam_to_orig_img(
             cam=pred_cam,
             bbox=bboxes,
@@ -231,6 +245,8 @@ def main(args):
             'betas': pred_betas,
             'joints3d': pred_joints3d,
             'joints2d': joints2d,
+            'n_joints2d': pred_joints2d,
+            'rotmat': rotmat,            
             'bboxes': bboxes,
             'frame_ids': frames,
         }
@@ -247,9 +263,13 @@ def main(args):
     print(f'Total time spent: {total_time:.2f} seconds (including model loading time).')
     print(f'Total FPS (including model loading time): {num_frames / total_time:.2f}.')
 
-    print(f'Saving output results to \"{os.path.join(output_path, "vibe_output.pkl")}\".')
+    #print(f'Saving output results to \"{os.path.join(output_path, "vibe_output.pkl")}\".')
+    #joblib.dump(vibe_results, os.path.join(output_path, "vibe_output.pkl"))
 
-    joblib.dump(vibe_results, os.path.join(output_path, "vibe_output.pkl"))
+    result_name = video_file.split('/')[-1].split('.mp4')[0] + ".pkl"
+    print(f'Saving output results to \"{os.path.join(args.output_folder, result_name)}\".')
+
+    joblib.dump(vibe_results, os.path.join(args.output_folder, result_name))
 
     if not args.no_render:
         # ========= Render results as a single video ========= #
@@ -274,42 +294,18 @@ def main(args):
             img_fname = image_file_names[frame_idx]
             img = cv2.imread(img_fname)
 
-            if args.sideview:
-                side_img = np.zeros_like(img)
-
             for person_id, person_data in frame_results[frame_idx].items():
                 frame_verts = person_data['verts']
                 frame_cam = person_data['cam']
 
                 mc = mesh_color[person_id]
 
-                mesh_filename = None
-
-                if args.save_obj:
-                    mesh_folder = os.path.join(output_path, 'meshes', f'{person_id:04d}')
-                    os.makedirs(mesh_folder, exist_ok=True)
-                    mesh_filename = os.path.join(mesh_folder, f'{frame_idx:06d}.obj')
-
                 img = renderer.render(
                     img,
                     frame_verts,
                     cam=frame_cam,
                     color=mc,
-                    mesh_filename=mesh_filename,
                 )
-
-                if args.sideview:
-                    side_img = renderer.render(
-                        side_img,
-                        frame_verts,
-                        cam=frame_cam,
-                        color=mc,
-                        angle=270,
-                        axis=[0,1,0],
-                    )
-
-            if args.sideview:
-                img = np.concatenate([img, side_img], axis=1)
 
             cv2.imwrite(os.path.join(output_img_folder, f'{frame_idx:06d}.png'), img)
 
@@ -322,13 +318,16 @@ def main(args):
             cv2.destroyAllWindows()
 
         # ========= Save rendered video ========= #
+        #todo: change directories
         vid_name = os.path.basename(video_file)
         save_name = f'{vid_name.replace(".mp4", "")}_vibe_result.mp4'
-        save_name = os.path.join(output_path, save_name)
+        #save_name = os.path.join(output_path, save_name)
+        save_name = os.path.join(args.output_folder, save_name)
         print(f'Saving result video to {save_name}')
         images_to_video(img_folder=output_img_folder, output_vid_file=save_name)
         shutil.rmtree(output_img_folder)
 
+    # timely off it cause will use separate prediction and rendering
     shutil.rmtree(image_folder)
     print('================= END =================')
 
@@ -370,13 +369,7 @@ if __name__ == '__main__':
                         help='disable final rendering of output video.')
 
     parser.add_argument('--wireframe', action='store_true',
-                        help='render all meshes as wireframes.')
-
-    parser.add_argument('--sideview', action='store_true',
-                        help='render meshes from alternate viewpoint.')
-
-    parser.add_argument('--save_obj', action='store_true',
-                        help='save results as .obj files.')
+                        help='render all meshes as wireframes')
 
     args = parser.parse_args()
 

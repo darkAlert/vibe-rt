@@ -39,8 +39,12 @@ def run_openpose(
         '--tracking', '1',
         '--render_pose', str(render),
         '--video', video_file,
+        '--write_video', video_file + '.mp4',
         '--write_json', output_folder,
-        '--display', str(display)
+        '--fps_max', str(30),
+        '--write_video_fps', str(30),
+        '--display', str(0), #str(display)
+        '--num_gpu', str(1)
     ]
 
     print('Executing', ' '.join(cmd))

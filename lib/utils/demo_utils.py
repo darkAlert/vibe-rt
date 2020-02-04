@@ -187,10 +187,18 @@ def video_to_images(vid_file, img_folder=None, return_info=False):
     os.makedirs(img_folder, exist_ok=True)
 
     command = ['ffmpeg',
-               '-i', vid_file,
-               '-f', 'image2',
-               '-v', 'error',
-               f'{img_folder}/%06d.png']
+              '-i', vid_file,
+              '-f', 'image2',
+              '-v', 'error',
+              f'{img_folder}/%06d.png']
+
+    # command = ['ffmpeg',
+    #            '-i', vid_file,
+    #            '-r', '30',
+    #            '-qscale:v', '2',
+    #            f'{img_folder}/%06d.png']
+
+
     print(f'Running \"{" ".join(command)}\"')
     subprocess.call(command)
 

@@ -64,8 +64,8 @@ H36M_TO_J17 = [6, 5, 4, 1, 2, 3, 16, 15, 14, 11, 12, 13, 8, 10, 0, 7, 9]
 H36M_TO_J14 = H36M_TO_J17[:14]
 
 
-def get_smpl_faces():
-    smpl = SMPL(SMPL_MODEL_DIR, batch_size=1, create_transl=False)
+def get_smpl_faces(gender='neutral'):
+    smpl = SMPL(SMPL_MODEL_DIR, gender, batch_size=1, create_transl=False)
     return smpl.faces
 
 def rot6d_to_rotmat_spin(x):
@@ -90,7 +90,8 @@ def rot6d_to_rotmat_spin(x):
     return torch.stack((b1, b2, b3), dim=-1)
 
 def rot6d_to_rotmat(x):
-    x = x.view(-1,3,2)
+    # x = x.view(-1,3,2)
+    x = x.reshape(-1,3,2)
 
     # Normalize the first vector
     b1 = F.normalize(x[:, :, 0], dim=1, eps=1e-6)
@@ -368,13 +369,25 @@ class Regressor(nn.Module):
 
         if self.use_6d:
             pred_rotmat = rot6d_to_rotmat(pred_pose).view(batch_size, 24, 3, 3)
+            #init_rotmat = rot6d_to_rotmat(init_pose).view(batch_size, 24, 3, 3)
 
+
+            # full predict
             pred_output = self.smpl(
-                betas=pred_shape,
-                body_pose=pred_rotmat[:, 1:],
-                global_orient=pred_rotmat[:, 0].unsqueeze(1),
-                pose2rot=False
+                 betas=pred_shape,
+                 body_pose=pred_rotmat[:, 1:],
+                 global_orient=pred_rotmat[:, 0].unsqueeze(1),
+                 pose2rot=False
             )
+
+            ## shape only predict
+            #pred_output = self.smpl(
+            #    betas=pred_shape,
+            #    body_pose=init_rotmat[:, 1:],
+            #    global_orient=init_rotmat[:, 0].unsqueeze(1),
+            #    pose2rot=False
+            #)
+
         else:
             pred_rotmat = pred_pose.view(batch_size, 72)
 
