@@ -20,14 +20,14 @@ def main(src_path):
     print("======================STAGE II CALCULATE VIBE PREDICT FOR EACH VIDEO======================")
     # python demo.py --vid_file hp_chrkey_data/p4_fs_l100/norm_30fps/cam1.mp4 --tracking_method pose --staf_dir ./STAF/openpose  --output_folder hp_norm_smpl_labels/ --wireframe --no_render --run_smplify
     for i in range(NUM_CAMS):
-        video_fname = os.path.join(src_path, f"cam{i + 1}.mp4")
+        video_fname = os.path.join(src_path, 'norm_30fps', 'cam' + str(i + 1) + ".mp4")
         cmd = [
             'python',
             'demo.py',
             '--vid_file', video_fname,
             '--tracking_method', 'pose',
             '--staf_dir', './STAF/openpose',
-            '--output_folder', os.path.join(src_path, "smpl_align"),
+            '--output_folder', os.path.join(src_path, '/smpl_align'),
             '--wireframe',
             '--no_render',
             '--run_smplify'
@@ -36,7 +36,7 @@ def main(src_path):
         subprocess.call(cmd)
 
     print("======================STAGE III CALCULATE SMPL AVERAGE FROM PREDICTS======================")
-    predict_src = os.path.join(src_path, 'smpl_align')
+    predict_src = os.path.join(src_path, '/smpl_align')
     cmd = [
         'python',
         'smpl_align.py',
@@ -48,8 +48,8 @@ def main(src_path):
     print("======================STAGE IV FINAL RENDERING FROM AVERAGED PREDICT======================")
     # python demo_render.py --vid_file hp_chrkey_data/p4_fs_l100/norm_30fps/cam1.mp4 --vibe_predict_file hp_norm_smpl_labels/cam1_fin.pkl --output_folder smpl_align/ --wireframe
     for i in range(NUM_CAMS):
-        video_fname = os.path.join(src_path, 'norm_30fps', f'cam{i + 1}.mp4')
-        predict_fname = os.path.join(src_path, "smpl_align", f"cam{i + 1}_fin.pkl")
+        video_fname = os.path.join(src_path, 'norm_30fps', 'cam' + str(i + 1) + ".mp4")
+        predict_fname = os.path.join(src_path, 'smpl_align', 'cam' + str(i + 1) + "_fin.pkl")
         output_path = os.path.join(src_path, 'smpl_align')
         cmd = [
             'python',
