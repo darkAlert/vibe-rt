@@ -26,8 +26,8 @@ def main(src_path):
             'demo.py',
             '--vid_file', video_fname,
             '--tracking_method', 'pose',
-            '--staf_dir', './STAF/openpose',
-            '--output_folder', os.path.join(src_path, '/smpl_align'),
+            '--staf_dir', '/home/kazendi/vlad/projects/openpose',
+            '--output_folder', os.path.join(src_path, 'smpl_align'),
             '--wireframe',
             '--no_render',
             '--run_smplify'
@@ -36,7 +36,7 @@ def main(src_path):
         subprocess.call(cmd)
 
     print("======================STAGE III CALCULATE SMPL AVERAGE FROM PREDICTS======================")
-    predict_src = os.path.join(src_path, '/smpl_align')
+    predict_src = os.path.join(src_path, 'smpl_align')
     cmd = [
         'python',
         'smpl_align.py',
@@ -67,7 +67,8 @@ def main(src_path):
 
 def run_all(root_path):
     for root, dirs, files in os.walk(root_path):
-        if len(dirs) == 0 and all(os.path.exists(os.path.join(root, f"cam{i + 1}")) for i in range(6)):
+        if len(dirs) == 0 and all(os.path.exists(os.path.join(root, f"cam{i + 1}.mp4")) for i in range(6)):
+            print("\n" * 5 + f"PROCESSING: {root}" + "\n" * 5)
             main(root)
 
 

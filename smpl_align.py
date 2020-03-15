@@ -5,6 +5,7 @@ import joblib
 import argparse
 import numpy as np
 from tqdm import tqdm
+import os
 
 #from smplx import SMPL as _SMPL
 from smplx import SMPL
@@ -13,6 +14,7 @@ from smplx.body_models import ModelOutput
 import numpy as np
 import torch
 
+SMOOTHING_WINDOW = None
 SMPL_MODEL_DIR = 'data/vibe_data'
 
 def distance(x1, y1, x2, y2):
@@ -32,12 +34,12 @@ def value(val: int, a_l: type) -> str:
 def main():
     src_path = sys.argv[1]
 
-    cam6_in = joblib.load(src_path + '/cam6.pkl')
-    cam5_in = joblib.load(src_path + '/cam5.pkl')
-    cam4_in = joblib.load(src_path + '/cam4.pkl')
-    cam1_in = joblib.load(src_path + '/cam1.pkl')
-    cam2_in = joblib.load(src_path + '/cam2.pkl')
-    cam3_in = joblib.load(src_path + '/cam3.pkl')
+    cam6_in = joblib.load(os.path.join(src_path, 'cam6.pkl'))
+    cam5_in = joblib.load(os.path.join(src_path, 'cam5.pkl'))
+    cam4_in = joblib.load(os.path.join(src_path, 'cam4.pkl'))
+    cam1_in = joblib.load(os.path.join(src_path, 'cam1.pkl'))
+    cam2_in = joblib.load(os.path.join(src_path, 'cam2.pkl'))
+    cam3_in = joblib.load(os.path.join(src_path, 'cam3.pkl'))
 
     print("SMPL dicts: ")
     print(cam6_in.keys())
@@ -200,7 +202,7 @@ def main():
             cams_in[k]["rotmat"][i][1:] = med_rotmat
 
 
-    smpl = SMPL(SMPL_MODEL_DIR, batch_size=seq_len, create_transl=False)
+    smpl = SMPL(SMPL_MODEL_DIR, batch_size=seq_len, create_transl=False, gender='male')
     for k in range(N):
         print(cams_in[k]["rotmat"].shape)
         torch_betas = torch.from_numpy(cams_in[k]["betas"])
@@ -212,10 +214,36 @@ def main():
                            pose2rot=False)
         #cams_in[k]["verts"] = pred_output.vertices.cpu().numpy()
 
+    def smooth_1d(x, SMOOTHING_WINDOW=30):
+      # from [-pi, pi] to [0, 2pi]
+      x += np.pi
+
+      # find discontinuities
+      c = np.zeros_like(x, np.float32)
+      c[np.where(np.diff(x) < -np.pi)[0]] = 2 * np.pi
+      c[np.where(np.diff(x) > np.pi)[0]] = -2 * np.pi
+
+      # from mod 2pi to continuous
+      x += np.cumsum(c)
+
+      # smoothing
+      x = np.convolve(x, [1.0 / SMOOTHING_WINDOW] * SMOOTHING_WINDOW, "same")
+
+      # from continuous to mod 2pi
+      x = x % (2 * np.pi)
+
+      return x - np.pi
+
     for k in range(N):
+        if SMOOTHING_WINDOW is not None and cams_in[k]["pose"].shape[0] > SMOOTHING_WINDOW:
+            cams_in[k]["pose"] = np.apply_along_axis(smooth_1d, 0, cams_in[k]["pose"]).astype(np.float32)
+
+            # cams_in[k]["pose"] = np.apply_along_axis(lambda x: np.convolve(x, [1.0 / SMOOTHING_WINDOW] * SMOOTHING_WINDOW, "same"), 0, cams_in[k]["pose"]).astype(np.float32)
+
         print(cams_in[k]["pose"].shape)
         torch_betas = torch.from_numpy(cams_in[k]["betas"])
         pred_pose = torch.from_numpy(cams_in[k]["pose"])
+
         print(pred_pose.shape)
         pred_output = smpl(betas=torch_betas,
                            body_pose=pred_pose[:, 3:],
@@ -247,17 +275,17 @@ def main():
 
     # Storing results
     import pickle
-    with open(src_path + '/cam6_fin.pkl', 'wb') as f:
+    with open(os.path.join(src_path, 'cam6_fin.pkl'), 'wb') as f:
         pickle.dump(cam6_out, f)
-    with open(src_path + '/cam5_fin.pkl', 'wb') as f:
+    with open(os.path.join(src_path, 'cam5_fin.pkl'), 'wb') as f:
         pickle.dump(cam5_out, f)
-    with open(src_path + '/cam4_fin.pkl', 'wb') as f:
+    with open(os.path.join(src_path, 'cam4_fin.pkl'), 'wb') as f:
         pickle.dump(cam4_out, f)
-    with open(src_path + '/cam1_fin.pkl', 'wb') as f:
+    with open(os.path.join(src_path, 'cam1_fin.pkl'), 'wb') as f:
         pickle.dump(cam1_out, f)
-    with open(src_path + '/cam2_fin.pkl', 'wb') as f:
+    with open(os.path.join(src_path, 'cam2_fin.pkl'), 'wb') as f:
         pickle.dump(cam2_out, f)
-    with open(src_path + '/cam3_fin.pkl', 'wb') as f:
+    with open(os.path.join(src_path, 'cam3_fin.pkl'), 'wb') as f:
         pickle.dump(cam3_out, f)
 
 if __name__ == '__main__':
