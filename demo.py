@@ -8,7 +8,7 @@
 # Any use of the computer program without a valid license is prohibited and
 # liable to prosecution.
 #
-# Copyright©2019 Max-Planck-Gesellschaft zur Förderung
+# Copyright2019 Max-Planck-Gesellschaft zur Förderung
 # der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
 # for Intelligent Systems. All rights reserved.
 #
@@ -47,30 +47,20 @@ from lib.utils.demo_utils import (
 
 MIN_NUM_FRAMES = 25
 
+
 def main(args):
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-    video_file = args.vid_file
+    frames_dir = os.path.join(args.root_dir, args.frames_dir)
 
-    # ========= [Optional] download the youtube video ========= #
-    if video_file.startswith('https://www.youtube.com'):
-        print(f'Donwloading YouTube video \"{video_file}\"')
-        video_file = download_youtube_clip(video_file, '/tmp')
+    if not os.path.exists(frames_dir):
+        exit(f'Input video \"{frames_dir}\" does not exist!')
 
-        if video_file is None:
-            exit('Youtube url is not valid!')
+    image_folder = frames_dir
+    num_frames = len(os.listdir(frames_dir))
+    img_shape = cv2.imread(os.path.join(frames_dir, os.listdir(frames_dir)[0])).shape
 
-        print(f'YouTube Video has been downloaded to {video_file}...')
-
-    if not os.path.isfile(video_file):
-        exit(f'Input video \"{video_file}\" does not exist!')
-
-    # making output to the same directory
-    #output_path = os.path.join(args.output_folder, os.path.basename(video_file).replace('.mp4', ''))
-    #os.makedirs(output_path, exist_ok=True)
-    os.makedirs(args.output_folder, exist_ok=True)
-
-    image_folder, num_frames, img_shape = video_to_images(video_file, return_info=True)
+    # image_folder, num_frames, img_shape = video_to_images(video_file, return_info=True)
 
     print(f'Input video number of frames {num_frames}')
     orig_height, orig_width = img_shape[:2]
@@ -80,10 +70,11 @@ def main(args):
     # ========= Run tracking ========= #
     bbox_scale = 1.1
     if args.tracking_method == 'pose':
-        if not os.path.isabs(video_file):
-            video_file = os.path.join(os.getcwd(), video_file)
-        tracking_results = run_posetracker(video_file, staf_folder=args.staf_dir, display=True) # args.display
-    else:
+        raise ValueError("openpose is available for video only")
+        # if not os.path.isabs(video_file):
+        #     video_file = os.path.join(os.getcwd(), video_file)
+        # tracking_results = run_posetracker(video_file, staf_folder=args.staf_dir, display=True) # args.display
+    elif args.tracking_method == "bbox":
         # run multi object tracker
         mot = MPT(
             device=device,
@@ -94,6 +85,19 @@ def main(args):
             yolo_img_size=args.yolo_img_size,
         )
         tracking_results = mot(image_folder)
+    elif os.path.exists(args.tracking_method):
+        boxes_xyxy = np.load(args.tracking_method)["boxes"]
+        boxes_xywh = np.zeros_like(boxes_xyxy)
+
+        boxes_xywh[:, 0] = (boxes_xyxy[:, 0] + boxes_xyxy[:, 2]) / 2
+        boxes_xywh[:, 1] = (boxes_xyxy[:, 1] + boxes_xyxy[:, 3]) / 2
+        boxes_xywh[:, 2] = boxes_xyxy[:, 2] - boxes_xyxy[:, 0]
+        boxes_xywh[:, 3] = boxes_xyxy[:, 3] - boxes_xyxy[:, 1]
+
+        tracking_results = {"1": {"bbox": boxes_xywh,
+                                  "frames": np.array(range(boxes_xywh.shape[0]))}}
+    else:
+        raise ValueError(f"{args.tracking_method} not in ['pose', 'bbox'] and such path doesn't exist")
 
     # remove tracklets if num_frames is less than MIN_NUM_FRAMES
     for person_id in list(tracking_results.keys()):
@@ -126,16 +130,12 @@ def main(args):
     for person_id in tqdm(list(tracking_results.keys())):
         bboxes = joints2d = None
 
-        if args.tracking_method == 'bbox':
+        if args.tracking_method == 'bbox' or os.path.exists(args.tracking_method):
             bboxes = tracking_results[person_id]['bbox']
         elif args.tracking_method == 'pose':
             joints2d = tracking_results[person_id]['joints2d']
 
         frames = tracking_results[person_id]['frames']
-
-        # debug
-        #print("frames shape = " + str(frames.shape))
-        #print(frames)
 
         dataset = Inference(
             image_folder=image_folder,
@@ -189,6 +189,7 @@ def main(args):
 
         # ========= [Optional] run Temporal SMPLify to refine the results ========= #
         if args.run_smplify and args.tracking_method == 'pose':
+            # TODO: will not work with non-openpose keypoints
            norm_joints2d = np.concatenate(norm_joints2d, axis=0)
            norm_joints2d = convert_kps(norm_joints2d, src='staf', dst='spin')
            norm_joints2d = torch.from_numpy(norm_joints2d).float().to(device)
@@ -237,6 +238,11 @@ def main(args):
             img_height=orig_height
         )
 
+        if os.path.exists(args.tracking_method):
+            kp = np.load(args.tracking_method)["keypoints"]
+            joints2d = {"0": {"joints2d": kp,
+                              "frames": np.array(range(kp.shape[0]))}}
+
         output_dict = {
             'pred_cam': pred_cam,
             'orig_cam': orig_cam,
@@ -263,15 +269,17 @@ def main(args):
     print(f'Total time spent: {total_time:.2f} seconds (including model loading time).')
     print(f'Total FPS (including model loading time): {num_frames / total_time:.2f}.')
 
-    #print(f'Saving output results to \"{os.path.join(output_path, "vibe_output.pkl")}\".')
-    #joblib.dump(vibe_results, os.path.join(output_path, "vibe_output.pkl"))
+    # making output to the same directory
+    output_dir = os.path.join(args.output_dir, args.frames_dir)
+    os.makedirs(output_dir, exist_ok=True)
 
-    result_name = video_file.split('/')[-1].split('.mp4')[0] + ".pkl"
-    print(f'Saving output results to \"{os.path.join(args.output_folder, result_name)}\".')
+    result_name = os.path.join(output_dir, "result.pkl")
+    print(f'Saving output results to \"{result_name}\".')
 
-    joblib.dump(vibe_results, os.path.join(args.output_folder, result_name))
+    joblib.dump(vibe_results, result_name)
 
-    if not args.no_render:
+    if False:
+    # if not args.no_render:  # TODO: might not work due to paths
         # ========= Render results as a single video ========= #
         renderer = Renderer(resolution=(orig_width, orig_height), orig_img=True, wireframe=args.wireframe)
 
@@ -307,7 +315,7 @@ def main(args):
                     color=mc,
                 )
 
-            cv2.imwrite(os.path.join(output_img_folder, f'{frame_idx:06d}.png'), img)
+            cv2.imwrite(os.path.join(output_img_folder, f'{frame_idx:05d}.jpg'), img)
 
             if args.display:
                 cv2.imshow('Video', img)
@@ -318,31 +326,36 @@ def main(args):
             cv2.destroyAllWindows()
 
         # ========= Save rendered video ========= #
-        #todo: change directories
-        vid_name = os.path.basename(video_file)
-        save_name = f'{vid_name.replace(".mp4", "")}_vibe_result.mp4'
-        #save_name = os.path.join(output_path, save_name)
-        save_name = os.path.join(args.output_folder, save_name)
-        print(f'Saving result video to {save_name}')
-        images_to_video(img_folder=output_img_folder, output_vid_file=save_name)
-        shutil.rmtree(output_img_folder)
+        # #todo: change directories
+        # vid_name = os.path.basename(video_file)
+        # save_name = f'{vid_name.replace(".mp4", "")}_vibe_result.mp4'
+        # #save_name = os.path.join(output_path, save_name)
+        # save_name = os.path.join(args.output_dir, save_name)
+        # print(f'Saving result video to {save_name}')
+        # images_to_video(img_folder=output_img_folder, output_vid_file=save_name)
+        # shutil.rmtree(output_img_folder)
 
     # timely off it cause will use separate prediction and rendering
-    shutil.rmtree(image_folder)
     print('================= END =================')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--vid_file', type=str,
-                        help='input video path or youtube link')
+    # python demo1.py --root_dir=/home/kazendi/vlad/data/HoloVideo/frames --frames_dir=person_1/light-100_temp-5600/garment_1/freestyle/cam1 --output_dir=/home/kazendi/vlad/data/HoloVideo/frames_res --wireframe --no_render
 
-    parser.add_argument('--output_folder', type=str,
+    parser.add_argument('--root_dir', type=str,
+                        help='root dir path')
+
+    parser.add_argument('--frames_dir', type=str,
+                        help='path to dir with frames relatively to the root_dir')
+
+    parser.add_argument('--output_dir', type=str,
                         help='output folder to write results')
 
-    parser.add_argument('--tracking_method', type=str, default='bbox', choices=['bbox', 'pose'],
-                        help='tracking method to calculate the tracklet of a subject from the input video')
+    parser.add_argument('--tracking_method', type=str, default='bbox',
+                        help='tracking method to calculate the tracklet of a subject from the input video. '
+                             'Either bbox or path to precalculated boxes/joints.')
 
     parser.add_argument('--detector', type=str, default='yolo', choices=['yolo', 'maskrcnn'],
                         help='object detector to be used for bbox tracking')
@@ -374,3 +387,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args)
+
