@@ -26,7 +26,7 @@ import colorsys
 import argparse
 import numpy as np
 from tqdm import tqdm
-from multi_person_tracker import MPT
+# from multi_person_tracker import MPT
 from torch.utils.data import DataLoader
 
 from lib.models.vibe import VIBE_Demo
@@ -44,9 +44,6 @@ from lib.utils.demo_utils import (
     images_to_video,
     download_ckpt,
 )
-
-MIN_NUM_FRAMES = 25
-
 
 def main(args):
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -76,15 +73,16 @@ def main(args):
         # tracking_results = run_posetracker(video_file, staf_folder=args.staf_dir, display=True) # args.display
     elif args.tracking_method == "bbox":
         # run multi object tracker
-        mot = MPT(
-            device=device,
-            batch_size=args.tracker_batch_size,
-            display=args.display,
-            detector_type=args.detector,
-            output_format='dict',
-            yolo_img_size=args.yolo_img_size,
-        )
-        tracking_results = mot(image_folder)
+        raise ValueError("Yolo is not available now")
+        # mot = MPT(
+        #     device=device,
+        #     batch_size=args.tracker_batch_size,
+        #     display=args.display,
+        #     detector_type=args.detector,
+        #     output_format='dict',
+        #     yolo_img_size=args.yolo_img_size,
+        # )
+        # tracking_results = mot(image_folder)
     elif os.path.exists(args.tracking_method):
         boxes_xyxy = np.load(args.tracking_method)["boxes"]
         boxes_xywh = np.zeros_like(boxes_xyxy)
@@ -98,11 +96,6 @@ def main(args):
                                   "frames": np.array(range(boxes_xywh.shape[0]))}}
     else:
         raise ValueError(f"{args.tracking_method} not in ['pose', 'bbox'] and such path doesn't exist")
-
-    # remove tracklets if num_frames is less than MIN_NUM_FRAMES
-    for person_id in list(tracking_results.keys()):
-        if tracking_results[person_id]['frames'].shape[0] < MIN_NUM_FRAMES:
-            del tracking_results[person_id]
 
     # ========= Define VIBE model ========= #
     model = VIBE_Demo(
@@ -149,7 +142,7 @@ def main(args):
         frames = dataset.frames
         has_keypoints = True if joints2d is not None else False
 
-        dataloader = DataLoader(dataset, batch_size=args.vibe_batch_size, num_workers=16)
+        dataloader = DataLoader(dataset, batch_size=args.vibe_batch_size, num_workers=12)
 
         with torch.no_grad():
 
@@ -385,6 +378,11 @@ if __name__ == '__main__':
                         help='render all meshes as wireframes')
 
     args = parser.parse_args()
+
+    # Params:
+    args.root_dir = '/home/darkalert/KazendiJob/Data/HoloVideo/Data/'
+    args.frames_dir = 'frames/person_1/light-100_temp-5600/garment_1/freestyle/cam1'
+    args.tracking_method = '/home/darkalert/KazendiJob/Data/HoloVideo/Data/poses/person_1/light-100_temp-5600/garment_1/freestyle/cam1/cam1.npz'
 
     main(args)
 
