@@ -65,7 +65,7 @@ H36M_TO_J14 = H36M_TO_J17[:14]
 
 
 def get_smpl_faces(gender='neutral'):
-    smpl = SMPL(SMPL_MODEL_DIR, gender, batch_size=1, create_transl=False)
+    smpl = SMPL(SMPL_MODEL_DIR, gender=gender, batch_size=1, create_transl=False)
     return smpl.faces
 
 def rot6d_to_rotmat_spin(x):

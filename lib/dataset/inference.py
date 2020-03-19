@@ -26,16 +26,18 @@ from lib.data_utils.img_utils import get_single_image_crop_demo
 
 
 class HoloInference(Dataset):
-    def __init__(self, frame_paths, bboxes, crop_size=224):
+    def __init__(self, root_dir, frame_paths, bboxes, crop_size=224):
         self.frame_paths = frame_paths
         self.bboxes = bboxes
         self.crop_size = crop_size
+        self.root_dir = root_dir
 
     def __len__(self):
         return len(self.frame_paths)
 
     def __getitem__(self, idx):
-        img = cv2.cvtColor(cv2.imread(self.frame_paths[idx]), cv2.COLOR_BGR2RGB)
+        path = os.path.join(self.root_dir, self.frame_paths[idx])
+        img = cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
         bbox = self.bboxes[idx]
         norm_img, _, _ = get_single_image_crop_demo(img, bbox, kp_2d=None, scale=1.0, crop_size=self.crop_size)
 

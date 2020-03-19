@@ -2,20 +2,20 @@ import os
 os.environ['PYOPENGL_PLATFORM'] = 'egl'
 
 import cv2
-import time
 import torch
 import joblib
 import argparse
 import numpy as np
-from tqdm import tqdm
 from torch.utils.data import DataLoader
 from lib.models.vibe import VIBE_Demo
-from lib.dataset.inference import Inference, HoloInference
-from lib.utils.demo_utils import convert_crop_cam_to_orig_img, download_ckpt
+from lib.dataset.inference import HoloInference
+from lib.utils.demo_utils import convert_crop_cam_to_orig_img
 from data_struct import DataStruct
+from lib.utils.renderer import Renderer
+import colorsys
 
 
-def predict_smpl(args):
+def predict_smpl(args, debug_render=False):
     # Load data:
     output_dir = os.path.join(args.root_dir, args.output_dir)
     frames_dir = os.path.join(args.root_dir, args.frames_dir)
@@ -33,6 +33,11 @@ def predict_smpl(args):
     print('Loaded pretrained weights from', args.vibe_model_path)
     print('Performance of pretrained model on 3DPW:', ckpt["performance"])
 
+    # Init rendered if needed:
+    if debug_render is True:
+        renderer = Renderer(resolution=(1920, 1080), orig_img=True, wireframe=True, gender='male')
+        mesh_color = colorsys.hsv_to_rgb(np.random.rand(), 0.5, 1.0)
+
     # Run VIBE model for all persons:
     for (f_node, f_path), (b_node, b_path) in zip(data_frames.nodes('cam'), data_bboxes.nodes('cam')):
         print ('Processing dir', f_path)
@@ -43,13 +48,15 @@ def predict_smpl(args):
         bboxes_npz = np.load(bboxes_path, encoding='latin1', allow_pickle=True)
         frame_ids = np.array(bboxes_npz['frames'])
         bboxes = np.array(bboxes_npz['bboxes'])
+        bboxes[:,0] = bboxes[:,0] + bboxes[:,2]*0.5     # (x,y,w,h) -> (cx,cy,w,h)
+        bboxes[:,1] = bboxes[:,1] + bboxes[:,3]*0.5
 
         # Prepare frames:
-        frame_paths = np.array([f.abs_path for f in data_frames.items(f_node)])
+        frame_paths = np.array([f.path for f in data_frames.items(f_node)])
         frame_paths = frame_paths[frame_ids]
 
         # Make pytorch dataloader:
-        dataset = HoloInference(frame_paths=frame_paths,bboxes=bboxes)
+        dataset = HoloInference(root_dir=frames_dir, frame_paths=frame_paths, bboxes=bboxes)
         dataloader = DataLoader(dataset, batch_size=args.vibe_batch_size, num_workers=args.num_workers)
 
         # Predict SMPL using VIBE model:
@@ -79,10 +86,10 @@ def predict_smpl(args):
             pred_joints2d = torch.cat(pred_joints2d, dim=0).cpu().numpy()
             rotmat = torch.cat(rotmat, dim=0).cpu().numpy()
 
-        # Save the result:
-        h, w = cv2.imread(frame_paths[0]).shape[:2]
-        orig_cam = convert_crop_cam_to_orig_img(cam=pred_cam, bbox=bboxes, img_width=h, img_height=w)
-
+        # Prepare the result:
+        path = os.path.join(frames_dir, frame_paths[0])
+        h, w = cv2.imread(path).shape[:2]
+        orig_cam = convert_crop_cam_to_orig_img(cam=pred_cam, bbox=bboxes, img_width=w, img_height=h)
         vibe_result = {
             'pred_cam': pred_cam,
             'orig_cam': orig_cam,
@@ -93,14 +100,66 @@ def predict_smpl(args):
             'n_joints2d': pred_joints2d,
             'rotmat': rotmat,
             'bboxes': bboxes,
-            'frame_ids': frame_ids
+            'frame_paths': frame_paths
         }
 
-        result_dir = os.path.join(output_dir, f_path)
+        # Renderer the result:
+        if debug_render is True:
+            idx = 0
+            img_path = os.path.join(frames_dir, vibe_result['frame_paths'][idx])
+            img = cv2.imread(img_path)
+            pred_verts = vibe_result['verts'][idx]
+            orig_cam = vibe_result['orig_cam'][idx]
+            result_img = renderer.render(img, pred_verts, cam=orig_cam, color=mesh_color)
+            cv2.imshow('result_img', result_img)
+            if cv2.waitKey() & 0xFF == ord('q'):
+                break
+        # Save the result:
+        else:
+            result_dir = os.path.join(output_dir, f_path)
+            if not os.path.exists(result_dir):
+                os.makedirs(result_dir)
+            result_path = os.path.join(result_dir, 'smpl.pkl')
+            joblib.dump(vibe_result, result_path)
+
+    print ('All done!')
+
+
+def render_smpl(root_dir, smpl_dir, frames_dir, output_dir, width=1920, height=1080, gender='male'):
+    # Load data:
+    output_dir = os.path.join(root_dir, output_dir)
+    frames_dir = os.path.join(root_dir, frames_dir)
+    smpl_dir = os.path.join(root_dir, smpl_dir)
+    data_smpl = DataStruct().parse(smpl_dir, levels='subject/light/garment/scene/cam', ext='pkl')
+
+    # Init renderer:
+    renderer = Renderer(resolution=(width, height), orig_img=True, wireframe=True, gender=gender)
+    mesh_color = colorsys.hsv_to_rgb(np.random.rand(), 0.5, 1.0)
+
+    # Render:
+    for node, path in data_smpl.nodes('cam'):
+        print ('Processing dir', path)
+        smpl_path = [smpl.abs_path for smpl in data_smpl.items(node)][0]
+        vibe_result = joblib.load(smpl_path, 'r')
+        n = len(vibe_result['frame_paths'])
+
+        result_dir = os.path.join(output_dir,path)
         if not os.path.exists(result_dir):
             os.makedirs(result_dir)
-        result_path = os.path.join(result_dir, 'smpl.pkl')
-        joblib.dump(vibe_result, result_path)
+
+        for idx in range(n):
+            img_path = os.path.join(frames_dir, vibe_result['frame_paths'][idx])
+            img = cv2.imread(img_path)
+            pred_verts = vibe_result['verts'][idx]
+            orig_cam = vibe_result['orig_cam'][idx]
+            result_img = renderer.render(img, pred_verts, cam=orig_cam,color=mesh_color)
+
+            #Save:
+            name = vibe_result['frame_paths'][idx].split('/')[-1]
+            out_path = os.path.join(result_dir, name)
+            cv2.imwrite(out_path, result_img)
+
+            print('{}/{}      '.format(idx + 1, n), end='\r')
 
     print ('All done!')
 
@@ -127,7 +186,9 @@ if __name__ == '__main__':
     args.root_dir = '/home/darkalert/KazendiJob/Data/HoloVideo/Data'
     args.frames_dir = 'frames'
     args.bboxes_dir = 'bboxes'
-    args.output_dir = 'smpl_by_vibe'
+    args.output_dir = 'smpl'
 
-    predict_smpl(args)
+    # predict_smpl(args, debug_render=False)
+
+    render_smpl(args.root_dir, smpl_dir='smpl', frames_dir='frames', output_dir='rendered_smpl')
 
