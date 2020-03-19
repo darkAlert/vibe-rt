@@ -1,6 +1,7 @@
 import os
 os.environ['PYOPENGL_PLATFORM'] = 'egl'
 
+import sys
 import cv2
 import torch
 import joblib
@@ -15,7 +16,7 @@ from lib.utils.renderer import Renderer
 import colorsys
 
 
-def predict_smpl(args, debug_render=False):
+def predict_smpl(args, debug_render=False, filter_by_person=None):
     # Load data:
     output_dir = os.path.join(args.root_dir, args.output_dir)
     frames_dir = os.path.join(args.root_dir, args.frames_dir)
@@ -40,6 +41,10 @@ def predict_smpl(args, debug_render=False):
 
     # Run VIBE model for all persons:
     for (f_node, f_path), (b_node, b_path) in zip(data_frames.nodes('cam'), data_bboxes.nodes('cam')):
+        if filter_by_person is not None:
+            person = f_path.split('/')[0]
+            if person != filter_by_person:
+                continue
         print ('Processing dir', f_path)
         assert f_path == b_path
 
@@ -163,7 +168,25 @@ def render_smpl(root_dir, smpl_dir, frames_dir, output_dir, width=1920, height=1
 
     print ('All done!')
 
-if __name__ == '__main__':
+
+def main(args):
+    # Parse params:
+    person = None
+    gpu_id = '0'
+    root_dir = '/home/darkalert/KazendiJob/Data/HoloVideo/Data'
+    if len(args) >= 3:
+        root_dir = args[0]
+        person = args[1]
+        gpu_id = str(args[2])
+    elif len(args) >= 2:
+        root_dir = args[0]
+        person = args[1]
+    elif len(args) >= 1:
+        root_dir = args[0]
+    os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id
+    print('person:', person, 'gpu_id:', gpu_id, 'root_dir:', root_dir)
+
+    # Set VIBE params:
     parser = argparse.ArgumentParser()
     parser.add_argument('--root_dir', type=str,
                         help='root dir path')
@@ -181,17 +204,21 @@ if __name__ == '__main__':
                         help='path to pretrained VIBE model')
     parser.add_argument('--bbox_scale', type=int, default=1.0,
                         help='scale for bounding boxes')
-    args = parser.parse_args()
+    vibe_args = parser.parse_args()
 
     # Params:
-    args.root_dir = '/home/darkalert/KazendiJob/Data/HoloVideo/Data'
-    args.frames_dir = 'frames'
-    # args.bboxes_dir = 'bboxes'
-    args.bboxes_dir = 'bboxes_by_maskrcnn'
-    args.output_dir = 'smpl' if args.bboxes_dir == 'bboxes' else 'smpl_maskrcnn'
-    args.bbox_scale = 1.0 if args.bboxes_dir == 'bboxes' else 1.1
+    vibe_args.root_dir = root_dir
+    vibe_args.frames_dir = 'frames'
+    # vibe_args.bboxes_dir = 'bboxes'
+    vibe_args.bboxes_dir = 'bboxes_by_maskrcnn'
+    vibe_args.output_dir = 'smpl' if args.bboxes_dir == 'bboxes' else 'smpl_maskrcnn'
+    vibe_args.bbox_scale = 1.0 if args.bboxes_dir == 'bboxes' else 1.1
 
-    # predict_smpl(args, debug_render=False)
+    predict_smpl(vibe_args, debug_render=False, filter_by_person=person)
 
-    render_smpl(args.root_dir, smpl_dir='smpl_maskrcnn', frames_dir='frames', output_dir='rendered_smpl_maskrcnn')
+    # render_smpl(vibe_args.root_dir, smpl_dir='smpl_maskrcnn', frames_dir='frames', output_dir='rendered_smpl_maskrcnn')
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
+
 
