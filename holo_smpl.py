@@ -56,7 +56,7 @@ def predict_smpl(args, debug_render=False):
         frame_paths = frame_paths[frame_ids]
 
         # Make pytorch dataloader:
-        dataset = HoloInference(root_dir=frames_dir, frame_paths=frame_paths, bboxes=bboxes)
+        dataset = HoloInference(root_dir=frames_dir, frame_paths=frame_paths, bboxes=bboxes, scale=args.bbox_scale)
         dataloader = DataLoader(dataset, batch_size=args.vibe_batch_size, num_workers=args.num_workers)
 
         # Predict SMPL using VIBE model:
@@ -163,7 +163,6 @@ def render_smpl(root_dir, smpl_dir, frames_dir, output_dir, width=1920, height=1
 
     print ('All done!')
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--root_dir', type=str,
@@ -180,15 +179,19 @@ if __name__ == '__main__':
                         help='batch size of VIBE')
     parser.add_argument('--vibe_model_path', type=str, default='data/vibe_data/vibe_model_wo_3dpw.pth.tar',
                         help='path to pretrained VIBE model')
+    parser.add_argument('--bbox_scale', type=int, default=1.0,
+                        help='scale for bounding boxes')
     args = parser.parse_args()
 
     # Params:
     args.root_dir = '/home/darkalert/KazendiJob/Data/HoloVideo/Data'
     args.frames_dir = 'frames'
-    args.bboxes_dir = 'bboxes'
-    args.output_dir = 'smpl'
+    # args.bboxes_dir = 'bboxes'
+    args.bboxes_dir = 'bboxes_by_maskrcnn'
+    args.output_dir = 'smpl' if args.bboxes_dir == 'bboxes' else 'smpl_maskrcnn'
+    args.bbox_scale = 1.0 if args.bboxes_dir == 'bboxes' else 1.1
 
     # predict_smpl(args, debug_render=False)
 
-    render_smpl(args.root_dir, smpl_dir='smpl', frames_dir='frames', output_dir='rendered_smpl')
+    render_smpl(args.root_dir, smpl_dir='smpl_maskrcnn', frames_dir='frames', output_dir='rendered_smpl_maskrcnn')
 
