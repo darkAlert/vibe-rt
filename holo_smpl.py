@@ -1,7 +1,6 @@
 import os
 os.environ['PYOPENGL_PLATFORM'] = 'egl'
 
-import sys
 import cv2
 import torch
 import joblib
@@ -17,7 +16,7 @@ import colorsys
 
 
 def predict_smpl(args, debug_render=False):
-    # Load data:
+    # Get data struct:
     output_dir = os.path.join(args.root_dir, args.output_dir)
     frames_dir = os.path.join(args.root_dir, args.frames_dir)
     bboxes_dir = os.path.join(args.root_dir, args.bboxes_dir)
@@ -130,45 +129,6 @@ def predict_smpl(args, debug_render=False):
     print ('All done!')
 
 
-def render_smpl(root_dir, smpl_dir, frames_dir, output_dir, width=1920, height=1080, gender='male'):
-    # Load data:
-    output_dir = os.path.join(root_dir, output_dir)
-    frames_dir = os.path.join(root_dir, frames_dir)
-    smpl_dir = os.path.join(root_dir, smpl_dir)
-    data_smpl = DataStruct().parse(smpl_dir, levels='subject/light/garment/scene/cam', ext='pkl')
-
-    # Init renderer:
-    renderer = Renderer(resolution=(width, height), orig_img=True, wireframe=True, gender=gender)
-    mesh_color = colorsys.hsv_to_rgb(np.random.rand(), 0.5, 1.0)
-
-    # Render:
-    for node, path in data_smpl.nodes('cam'):
-        print ('Processing dir', path)
-        smpl_path = [smpl.abs_path for smpl in data_smpl.items(node)][0]
-        vibe_result = joblib.load(smpl_path, 'r')
-        n = len(vibe_result['frame_paths'])
-
-        result_dir = os.path.join(output_dir,path)
-        if not os.path.exists(result_dir):
-            os.makedirs(result_dir)
-
-        for idx in range(n):
-            img_path = os.path.join(frames_dir, vibe_result['frame_paths'][idx])
-            img = cv2.imread(img_path)
-            pred_verts = vibe_result['verts'][idx]
-            orig_cam = vibe_result['orig_cam'][idx]
-            result_img = renderer.render(img, pred_verts, cam=orig_cam,color=mesh_color)
-
-            #Save:
-            name = vibe_result['frame_paths'][idx].split('/')[-1]
-            out_path = os.path.join(result_dir, name)
-            cv2.imwrite(out_path, result_img)
-
-            print('{}/{}      '.format(idx + 1, n), end='\r')
-
-    print ('All done!')
-
-
 def main():
     # Set VIBE params:
     parser = argparse.ArgumentParser()
@@ -198,7 +158,7 @@ def main():
     args.frames_dir = 'frames'
     # args.bboxes_dir = 'bboxes'
     args.bboxes_dir = 'bboxes_by_maskrcnn'
-    args.output_dir = 'smpl' if args.bboxes_dir == 'bboxes' else 'smpl_maskrcnn'
+    args.output_dir = 'smpl' if args.bboxes_dir == 'bboxes' else 'smpl_maskrcnn2'
     args.bbox_scale = 1.0 if args.bboxes_dir == 'bboxes' else 1.1
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
@@ -206,7 +166,6 @@ def main():
 
     predict_smpl(args, debug_render=False)
 
-    # render_smpl(args.root_dir, smpl_dir='smpl_maskrcnn', frames_dir='frames', output_dir='rendered_smpl_maskrcnn')
 
 if __name__ == '__main__':
     main()
