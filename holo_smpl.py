@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from lib.models.vibe import VIBE_Demo
 from lib.dataset.inference import HoloInference
 from lib.utils.demo_utils import convert_crop_cam_to_orig_img
-from data_struct import DataStruct
+from holo.data_struct import DataStruct
 from lib.utils.renderer import Renderer
 import colorsys
 
@@ -65,7 +65,7 @@ def predict_smpl(args, debug_render=False):
 
         # Predict SMPL using VIBE model:
         with torch.no_grad():
-            pred_cam, pred_verts, pred_pose, pred_betas, pred_joints3d, norm_joints2d = [], [], [], [], [], []
+            pred_cam, pred_pose, pred_betas, pred_joints3d, norm_joints2d = [], [], [], [], [], []
             pred_joints2d, rotmat = [], []
 
             for batch in dataloader:
@@ -75,7 +75,7 @@ def predict_smpl(args, debug_render=False):
                 output = vibe_model(batch)[-1]
 
                 pred_cam.append(output['theta'][:, :, :3].reshape(batch_size * seqlen, -1))
-                pred_verts.append(output['verts'].reshape(batch_size * seqlen, -1, 3))
+                # pred_verts.append(output['verts'].reshape(batch_size * seqlen, -1, 3))
                 pred_pose.append(output['theta'][:, :, 3:75].reshape(batch_size * seqlen, -1))
                 pred_betas.append(output['theta'][:, :, 75:].reshape(batch_size * seqlen, -1))
                 pred_joints3d.append(output['kp_3d'].reshape(batch_size * seqlen, -1, 3))
@@ -83,7 +83,7 @@ def predict_smpl(args, debug_render=False):
                 rotmat.append(output['rotmat'].reshape(batch_size * seqlen, -1, 3, 3))
 
             pred_cam = torch.cat(pred_cam, dim=0).cpu().numpy()
-            pred_verts = torch.cat(pred_verts, dim=0).cpu().numpy()
+            # pred_verts = torch.cat(pred_verts, dim=0).cpu().numpy()
             pred_pose = torch.cat(pred_pose, dim=0).cpu().numpy()
             pred_betas = torch.cat(pred_betas, dim=0).cpu().numpy()
             pred_joints3d = torch.cat(pred_joints3d, dim=0).cpu().numpy()
@@ -97,7 +97,7 @@ def predict_smpl(args, debug_render=False):
         vibe_result = {
             'pred_cam': pred_cam,
             'orig_cam': orig_cam,
-            'verts': pred_verts,
+            # 'verts': pred_verts,
             'pose': pred_pose,
             'betas': pred_betas,
             'joints3d': pred_joints3d,

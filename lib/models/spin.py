@@ -373,6 +373,8 @@ class Regressor(nn.Module):
 
 
             # full predict
+            print(pred_rotmat[:, 0].shape)
+            print (pred_rotmat[:, 0].unsqueeze(1).shape)
             pred_output = self.smpl(
                  betas=pred_shape,
                  body_pose=pred_rotmat[:, 1:],
