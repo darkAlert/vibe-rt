@@ -71,6 +71,12 @@ def align_smpl(args):
                 smpl_in[cam_name] = dict(data)
         assert len(smpl_in) == 6, (len(smpl_in))
 
+        if args.trim_frames:
+            n = min([smpl['frame_paths'].shape[0] for smpl in smpl_in.values()])
+            for k1 in smpl_in.keys():
+                for k2 in smpl_in[k1].keys():
+                    smpl_in[k1][k2] = smpl_in[k1][k2][:n]
+
         # Find the most frontal camera indices:
         J2D = {k : v['n_joints2d'] for k,v in smpl_in.items()}
         seq_len = len(list(J2D.values())[0])
@@ -139,10 +145,14 @@ def align_smpl(args):
                          verts=smpl_in[cam_name]['verts'])
             else:
                 if args.output_format == 'LWGAN':
+                    cams = smpl_in[cam_name]['avatar_cam']
+                    if cams.shape[1] > 3:
+                        cams = np.stack((cams[:,0], cams[:,2], cams[:,3]), axis=1)
+                    assert cams.shape[1] == 3
                     np.savez(result_path,
-                             cam=smpl_in[cam_name]['avatar_cam'],
+                             cams=cam,
                              pose=smpl_in[cam_name]['pose'],
-                             betas=smpl_in[cam_name]['betas'])
+                             shape=smpl_in[cam_name]['betas'])
                 else:
                     np.savez(result_path,
                              avatar_cam=smpl_in[cam_name]['avatar_cam'],
@@ -177,10 +187,15 @@ def main():
                         help='include vertices in the result file')
     parser.add_argument('--output_format', type=str, default='DEBUG',
                         help='format for packing the resultr: LWGAN or DEBUG')
+    parser.add_argument('--trim_frames', action="store_true", default=True,
+                        help='trim excess frames to synch different cameras')
+
     args = parser.parse_args()
 
-    args.include_vertices = True
-    # args.output_format = 'LWGAN'
+    # args.include_vertices = True
+    args.output_format = 'LWGAN'
+    args.smpl_dir = 'smpl_by_maskrcnn'
+    args.result_dir = 'smpl_aligned_lwgan'
 
     align_smpl(args)
 

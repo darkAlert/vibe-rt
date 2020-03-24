@@ -55,6 +55,8 @@ def render_smpl(args):
             img = cv2.imread(img_path)
             pred_verts = vibe_result['verts'][idx]
             cam = vibe_result[render_cam][idx]
+            if len(cam) == 3:
+                cam = np.array([cam[0], cam[0], cam[1], cam[2]])
             result_img = renderer.render(img, pred_verts, cam=cam,color=mesh_color)
 
             #Save:
@@ -93,8 +95,9 @@ def main():
     args = parser.parse_args()
 
     args.smpl_dir = 'smpl_maskrcnn_aligned'
-    args.output_dir = 'rendered_smpl_maskrcnn_aligned'
+    args.output_dir = 'rendered_smpl_maskrcnn_aligned_'
     args.cam = 'avatar_cam'
+    args.frames_dir = 'avatars'
     args.width = 256
     args.height = 256
     args.max_frames = 250
