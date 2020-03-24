@@ -94,9 +94,9 @@ def main():
 
     args.smpl_dir = 'smpl_maskrcnn_aligned'
     args.output_dir = 'rendered_smpl_maskrcnn_aligned'
-    # args.cam = 'avatar_cam'
-    # args.width = 256
-    # args.height = 256
+    args.cam = 'avatar_cam'
+    args.width = 256
+    args.height = 256
     args.max_frames = 250
 
     render_smpl(args)

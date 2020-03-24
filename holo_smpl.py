@@ -65,7 +65,7 @@ def predict_smpl(args, debug_render=False):
 
         # Predict SMPL using VIBE model:
         with torch.no_grad():
-            pred_cam, pred_pose, pred_betas, pred_joints3d, norm_joints2d = [], [], [], [], [], []
+            pred_cam, pred_pose, pred_betas, pred_joints3d, norm_joints2d = [], [], [], [], []
             pred_joints2d, rotmat = [], []
 
             for batch in dataloader:
