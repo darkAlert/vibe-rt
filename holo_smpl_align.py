@@ -150,7 +150,7 @@ def align_smpl(args):
                         cams = np.stack((cams[:,0], cams[:,2], cams[:,3]), axis=1)
                     assert cams.shape[1] == 3
                     np.savez(result_path,
-                             cams=cam,
+                             cams=cams,
                              pose=smpl_in[cam_name]['pose'],
                              shape=smpl_in[cam_name]['betas'])
                 else:
@@ -192,10 +192,10 @@ def main():
 
     args = parser.parse_args()
 
-    # args.include_vertices = True
-    args.output_format = 'LWGAN'
-    args.smpl_dir = 'smpl_by_maskrcnn'
-    args.result_dir = 'smpl_aligned_lwgan'
+    args.include_vertices = True
+    # args.output_format = 'LWGAN'
+    args.smpl_dir = 'smpl_debug'
+    args.result_dir = 'smpl_aligned_debug'
 
     align_smpl(args)
 

@@ -22,7 +22,8 @@ def render_smpl(args):
 
     # Load data:
     output_dir = os.path.join(root_dir, output_dir)
-    frames_dir = os.path.join(root_dir, frames_dir)
+    if frames_dir is not None:
+        frames_dir = os.path.join(root_dir, frames_dir)
     smpl_dir = os.path.join(root_dir, smpl_dir)
     data_smpl = DataStruct().parse(smpl_dir, levels='subject/light/garment/scene/cam', ext=format)
 
@@ -32,6 +33,10 @@ def render_smpl(args):
 
     # Render:
     for node, path in data_smpl.nodes('cam'):
+        if args.person is not None:
+            person = path.split('/')[0]
+            if person != args.person:
+                continue
         print ('Processing dir', path)
 
         smpl_path = [smpl.abs_path for smpl in data_smpl.items(node)][0]
@@ -51,8 +56,11 @@ def render_smpl(args):
             os.makedirs(result_dir)
 
         for idx in range(n):
-            img_path = os.path.join(frames_dir, vibe_result['frame_paths'][idx])
-            img = cv2.imread(img_path)
+            if frames_dir is not None:
+                img_path = os.path.join(frames_dir, vibe_result['frame_paths'][idx])
+                img = cv2.imread(img_path)
+            else:
+                img = np.zeros((args.height,args.width,3), np.uint8)
             pred_verts = vibe_result['verts'][idx]
             cam = vibe_result[render_cam][idx]
             if len(cam) == 3:
@@ -92,15 +100,18 @@ def main():
                         help='npz or pkl')
     parser.add_argument('--cam', type=str, default='orig_cam',
                         help='cam for rendering: orig_cam, pred_cam or avatar_cam')
+    parser.add_argument('--person', type=str, default=None,
+                        help='render a target person only')
     args = parser.parse_args()
 
-    args.smpl_dir = 'smpl_maskrcnn_aligned'
-    args.output_dir = 'rendered_smpl_maskrcnn_aligned_'
+    args.smpl_dir = 'smpl_aligned_debug'
+    args.output_dir = 'rendered_smpl_aligned_debug'
     args.cam = 'avatar_cam'
-    args.frames_dir = 'avatars'
+    args.frames_dir = None#'avatars'
     args.width = 256
     args.height = 256
-    args.max_frames = 250
+    # args.max_frames = 25
+    args.person = 'person_6'
 
     render_smpl(args)
 
