@@ -44,6 +44,10 @@ def predict_smpl(args, debug_render=False):
             person = f_path.split('/')[0]
             if person != args.person:
                 continue
+        if args.filter_by_path is not None:
+            cur_path = f_path.split('/cam')[0]
+            if cur_path != args.filter_by_path:
+                continue
         print ('Processing dir', f_path)
         assert f_path == b_path
 
@@ -66,6 +70,7 @@ def predict_smpl(args, debug_render=False):
         # Predict SMPL using VIBE model:
         with torch.no_grad():
             pred_cam, pred_pose, pred_betas, pred_joints3d, norm_joints2d = [], [], [], [], []
+            pred_verts = []
             pred_joints2d, rotmat = [], []
 
             for batch in dataloader:
@@ -75,7 +80,8 @@ def predict_smpl(args, debug_render=False):
                 output = vibe_model(batch)[-1]
 
                 pred_cam.append(output['theta'][:, :, :3].reshape(batch_size * seqlen, -1))
-                # pred_verts.append(output['verts'].reshape(batch_size * seqlen, -1, 3))
+                if args.add_verts:
+                    pred_verts.append(output['verts'].reshape(batch_size * seqlen, -1, 3))
                 pred_pose.append(output['theta'][:, :, 3:75].reshape(batch_size * seqlen, -1))
                 pred_betas.append(output['theta'][:, :, 75:].reshape(batch_size * seqlen, -1))
                 pred_joints3d.append(output['kp_3d'].reshape(batch_size * seqlen, -1, 3))
@@ -83,7 +89,8 @@ def predict_smpl(args, debug_render=False):
                 rotmat.append(output['rotmat'].reshape(batch_size * seqlen, -1, 3, 3))
 
             pred_cam = torch.cat(pred_cam, dim=0).cpu().numpy()
-            # pred_verts = torch.cat(pred_verts, dim=0).cpu().numpy()
+            if args.add_verts:
+                pred_verts = torch.cat(pred_verts, dim=0).cpu().numpy()
             pred_pose = torch.cat(pred_pose, dim=0).cpu().numpy()
             pred_betas = torch.cat(pred_betas, dim=0).cpu().numpy()
             pred_joints3d = torch.cat(pred_joints3d, dim=0).cpu().numpy()
@@ -94,18 +101,32 @@ def predict_smpl(args, debug_render=False):
         path = os.path.join(frames_dir, frame_paths[0])
         h, w = cv2.imread(path).shape[:2]
         orig_cam = convert_crop_cam_to_orig_img(cam=pred_cam, bbox=bboxes, img_width=w, img_height=h)
-        vibe_result = {
-            'pred_cam': pred_cam,
-            'orig_cam': orig_cam,
-            # 'verts': pred_verts,
-            'pose': pred_pose,
-            'betas': pred_betas,
-            'joints3d': pred_joints3d,
-            'n_joints2d': pred_joints2d,
-            'rotmat': rotmat,
-            'bboxes': bboxes,
-            'frame_paths': frame_paths
-        }
+
+        if args.add_verts:
+            vibe_result = {
+                'pred_cam': pred_cam,
+                'orig_cam': orig_cam,
+                'verts': pred_verts,
+                'pose': pred_pose,
+                'betas': pred_betas,
+                'joints3d': pred_joints3d,
+                'n_joints2d': pred_joints2d,
+                'rotmat': rotmat,
+                'bboxes': bboxes,
+                'frame_paths': frame_paths
+            }
+        else:
+            vibe_result = {
+                'pred_cam': pred_cam,
+                'orig_cam': orig_cam,
+                'pose': pred_pose,
+                'betas': pred_betas,
+                'joints3d': pred_joints3d,
+                'n_joints2d': pred_joints2d,
+                'rotmat': rotmat,
+                'bboxes': bboxes,
+                'frame_paths': frame_paths
+            }
 
         # Renderer the result:
         if debug_render is True:
@@ -152,6 +173,10 @@ def main():
                         help='gpu id')
     parser.add_argument('--person', type=str, default=None,
                         help='filter data by person')
+    parser.add_argument('--filter_by_path', type=str, default=None,
+                        help='filter data by given path')
+    parser.add_argument('--add_verts', action='store_true', default=False,
+                        help='add vertices to output npz')
     args = parser.parse_args()
 
     # Params:
@@ -163,6 +188,8 @@ def main():
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
     print('person:', args.person, ', gpu_id:', args.gpu_id, ', root_dir:', args.root_dir)
+    if args.filter_by_path is not None:
+        print ('filter by path:', args.filter_by_path)
 
     predict_smpl(args, debug_render=False)
 
