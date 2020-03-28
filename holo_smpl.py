@@ -155,11 +155,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--root_dir', type=str, default='/home/darkalert/KazendiJob/Data/HoloVideo/Data',
                         help='root dir path')
-    parser.add_argument('--frames_dir', type=str,
+    parser.add_argument('--frames_dir', type=str, default='frames',
                         help='path to dir with frames relatively to the root_dir')
-    parser.add_argument('--bboxes_dir', type=str,
+    parser.add_argument('--bboxes_dir', type=str, default='bboxes_by_maskrcnn',
                         help='path to dir with bounding boxes relatively to the root_dir')
-    parser.add_argument('--output_dir', type=str,
+    parser.add_argument('--output_dir', type=str, default='smpls',
                         help='output folder to write results')
     parser.add_argument('--num_workers', type=int, default=12,
                         help='number of workers for dataloader')
@@ -167,7 +167,7 @@ def main():
                         help='batch size of VIBE')
     parser.add_argument('--vibe_model_path', type=str, default='data/vibe_data/vibe_model_wo_3dpw.pth.tar',
                         help='path to pretrained VIBE model')
-    parser.add_argument('--bbox_scale', type=int, default=1.0,
+    parser.add_argument('--bbox_scale', type=int, default=1.1,
                         help='scale for bounding boxes')
     parser.add_argument('--gpu_id', type=str, default='0',
                         help='gpu id')
@@ -175,16 +175,21 @@ def main():
                         help='filter data by person')
     parser.add_argument('--filter_by_path', type=str, default=None,
                         help='filter data by given path')
-    parser.add_argument('--add_verts', action='store_true', default=False,
+    parser.add_argument('--add_verts', action='store_true',
                         help='add vertices to output npz')
+    parser.add_argument('--debug', action='store_false',
+                        help='')
     args = parser.parse_args()
 
     # Params:
-    args.frames_dir = 'frames'
-    # args.bboxes_dir = 'bboxes'
-    args.bboxes_dir = 'bboxes_by_maskrcnn'
-    args.output_dir = 'smpl' if args.bboxes_dir == 'bboxes' else 'smpl_maskrcnn2'
-    args.bbox_scale = 1.0 if args.bboxes_dir == 'bboxes' else 1.1
+    if args.debug:
+        args.frames_dir = 'frames'
+        # args.bboxes_dir = 'bboxes'
+        args.bboxes_dir = 'bboxes_by_maskrcnn'
+        args.output_dir = 'smpl' if args.bboxes_dir == 'bboxes' else 'smpl_maskrcnn2'
+        args.bbox_scale = 1.0 if args.bboxes_dir == 'bboxes' else 1.1
+        args.filter_by_path = 'person_2/light-100_temp-5600/garments_2/front_position'
+        args.add_verts=True
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
     print('person:', args.person, ', gpu_id:', args.gpu_id, ', root_dir:', args.root_dir)
@@ -192,7 +197,6 @@ def main():
         print ('filter by path:', args.filter_by_path)
 
     predict_smpl(args, debug_render=False)
-
 
 if __name__ == '__main__':
     main()
