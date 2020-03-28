@@ -16,6 +16,10 @@ import colorsys
 
 
 def predict_smpl(args, debug_render=False):
+    filter_by_persons = None
+    if args.persons is not None and args.persons:
+        filter_by_persons = args.persons.split(',')
+
     # Get data struct:
     output_dir = os.path.join(args.root_dir, args.output_dir)
     frames_dir = os.path.join(args.root_dir, args.frames_dir)
@@ -40,9 +44,9 @@ def predict_smpl(args, debug_render=False):
 
     # Run VIBE model for all persons:
     for (f_node, f_path), (b_node, b_path) in zip(data_frames.nodes('cam'), data_bboxes.nodes('cam')):
-        if args.person is not None:
+        if args.filter_by_persons is not None:
             person = f_path.split('/')[0]
-            if person != args.person:
+            if not any(person == p for p in filter_by_persons):
                 continue
         if args.filter_by_path is not None:
             cur_path = f_path.split('/cam')[0]
@@ -175,8 +179,8 @@ def main():
                         help='scale for bounding boxes')
     parser.add_argument('--gpu_id', type=str, default='0',
                         help='gpu id')
-    parser.add_argument('--person', type=str, default=None,
-                        help='filter data by person')
+    parser.add_argument('--persons', type=str, default=None,
+                        help='filter data by persons')
     parser.add_argument('--filter_by_path', type=str, default=None,
                         help='filter data by given path')
     parser.add_argument('--add_verts', action='store_true',
@@ -196,7 +200,7 @@ def main():
         args.add_verts=True
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
-    print('person:', args.person, ', gpu_id:', args.gpu_id, ', root_dir:', args.root_dir)
+    print('persons:', args.persons, ', gpu_id:', args.gpu_id, ', root_dir:', args.root_dir)
     if args.filter_by_path is not None:
         print ('filter by path:', args.filter_by_path)
 
