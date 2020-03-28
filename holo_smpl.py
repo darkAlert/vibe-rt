@@ -182,7 +182,7 @@ def main():
     args = parser.parse_args()
 
     # Params:
-    if args.debug:
+    if args.debug_off:
         args.frames_dir = 'frames'
         # args.bboxes_dir = 'bboxes'
         args.bboxes_dir = 'bboxes_by_maskrcnn'
