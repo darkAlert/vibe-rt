@@ -177,7 +177,7 @@ def main():
                         help='filter data by given path')
     parser.add_argument('--add_verts', action='store_true',
                         help='add vertices to output npz')
-    parser.add_argument('--debug', action='store_false',
+    parser.add_argument('--debug_off', action='store_false',
                         help='')
     args = parser.parse_args()
 
