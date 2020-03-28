@@ -20,8 +20,8 @@ def predict_smpl(args, debug_render=False):
     output_dir = os.path.join(args.root_dir, args.output_dir)
     frames_dir = os.path.join(args.root_dir, args.frames_dir)
     bboxes_dir = os.path.join(args.root_dir, args.bboxes_dir)
-    data_frames = DataStruct().parse(frames_dir, levels='subject/light/garment/scene/cam', ext='jpeg')
-    data_bboxes = DataStruct().parse(bboxes_dir, levels='subject/light/garment/scene/cam', ext='npz')
+    data_frames = DataStruct().parse(frames_dir, levels=args.frame_levels, ext='jpeg')
+    data_bboxes = DataStruct().parse(bboxes_dir, levels=args.bbox_levels, ext='npz')
 
     # Init VIBE model:
     assert os.path.exists(args.vibe_model_path)
@@ -161,6 +161,10 @@ def main():
                         help='path to dir with bounding boxes relatively to the root_dir')
     parser.add_argument('--output_dir', type=str, default='smpls',
                         help='output folder to write results')
+    parser.add_argument('--frame_levels', type=str, default='subject/light/garment/scene/cam',
+                        help='frame levels for DataStruct')
+    parser.add_argument('--bbox_levels', type=str, default='subject/light/garment/scene/cam',
+                        help='bbox levels for DataStruct')
     parser.add_argument('--num_workers', type=int, default=12,
                         help='number of workers for dataloader')
     parser.add_argument('--vibe_batch_size', type=int, default=64,
