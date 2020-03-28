@@ -44,7 +44,7 @@ def predict_smpl(args, debug_render=False):
 
     # Run VIBE model for all persons:
     for (f_node, f_path), (b_node, b_path) in zip(data_frames.nodes('cam'), data_bboxes.nodes('cam')):
-        if args.filter_by_persons is not None:
+        if filter_by_persons is not None:
             person = f_path.split('/')[0]
             if not any(person == p for p in filter_by_persons):
                 continue
