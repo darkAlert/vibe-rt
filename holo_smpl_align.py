@@ -195,7 +195,7 @@ def main():
     args.include_vertices = True
     # args.output_format = 'LWGAN'
     args.smpl_dir = 'smpl_debug'
-    args.result_dir = 'smpl_aligned_debug'
+    args.result_dir = 'smpl_debug_aligned'
 
     align_smpl(args)
 

@@ -104,15 +104,15 @@ def main():
                         help='render a target person only')
     args = parser.parse_args()
 
-    args.smpl_dir = 'smpl_maskrcnn2'
-    args.output_dir = 'rendered_smpl_maskrcnn2'
-    # args.cam = 'avatar_cam'
-    args.frames_dir = 'frames'
-    # args.width = 256
-    # args.height = 256
+    args.smpl_dir = 'smpl_debug_aligned'
+    args.output_dir = 'rendered_smpl_debug_aligned'
+    args.cam = 'avatar_cam'
+    args.frames_dir = 'avatars'
+    args.width = 256
+    args.height = 256
     # args.max_frames = 25
-    args.person = 'person_2'
-    args.input_format = 'pkl'
+    # args.person = 'person_2'
+    # args.input_format = 'pkl'
 
     render_smpl(args)
 
