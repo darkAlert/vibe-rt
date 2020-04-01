@@ -4,6 +4,7 @@ import argparse
 import torch
 from lib.models.spin import SMPL
 from holo.data_struct import DataStruct
+from lib.utils.geometry import rotation_matrix_to_angle_axis
 
 
 def find_frontal_camera(J2D, seq_len):
@@ -104,8 +105,14 @@ def align_smpl(args):
             # Renew the predicts with averaged values:
             for k in smpl_in.keys():
                 smpl_in[k]['betas'][frame_i][:] = med_shape
-                smpl_in[k]['pose'][frame_i][3:] = med_pose[3:]
+                # smpl_in[k]['pose'][frame_i][3:] = med_pose[3:]
                 smpl_in[k]['rotmat'][frame_i][1:] = med_rotmat[1:]
+
+                # Fix a pose by rotmat:
+                if args.pose_by_rotmat:
+                    rotmat = torch.from_numpy(smpl_in[k]['rotmat'][frame_i])
+                    pose = rotation_matrix_to_angle_axis(rotmat.reshape(-1, 3, 3)).reshape(-1, 72)
+                    smpl_in[k]['pose'][frame_i] = pose.cpu().numpy()
 
         # Regenerate SMPL vertices:
         if args.include_vertices:
@@ -129,30 +136,30 @@ def align_smpl(args):
                 os.makedirs(result_dir)
             result_path = os.path.join(result_dir, 'smpl.npz')
 
-            if args.include_vertices:
+            if args.output_format == 'LWGAN':
+                cams = smpl_in[cam_name]['avatar_cam']
+                if cams.shape[1] > 3:
+                    cams = np.stack((cams[:, 0], cams[:, 2], cams[:, 3]), axis=1)
+                assert cams.shape[1] == 3
                 np.savez(result_path,
-                         avatar_cam=smpl_in[cam_name]['avatar_cam'],
-                         avatar_bboxes=smpl_in[cam_name]['bboxes'],
-                         pred_cam=smpl_in[cam_name]['pred_cam'],
-                         orig_cam=smpl_in[cam_name]['orig_cam'],
+                         cams=cams,
                          pose=smpl_in[cam_name]['pose'],
-                         betas=smpl_in[cam_name]['betas'],
-                         joints3d=smpl_in[cam_name]['joints3d'],
-                         n_joints2d=smpl_in[cam_name]['n_joints2d'],
-                         rotmat=smpl_in[cam_name]['rotmat'],
-                         bboxes=smpl_in[cam_name]['bboxes'],
-                         frame_paths=smpl_in[cam_name]['frame_paths'],
-                         verts=smpl_in[cam_name]['verts'])
+                         shape=smpl_in[cam_name]['betas'])
             else:
-                if args.output_format == 'LWGAN':
-                    cams = smpl_in[cam_name]['avatar_cam']
-                    if cams.shape[1] > 3:
-                        cams = np.stack((cams[:,0], cams[:,2], cams[:,3]), axis=1)
-                    assert cams.shape[1] == 3
+                if args.include_vertices:
                     np.savez(result_path,
-                             cams=cams,
+                             avatar_cam=smpl_in[cam_name]['avatar_cam'],
+                             avatar_bboxes=smpl_in[cam_name]['bboxes'],
+                             pred_cam=smpl_in[cam_name]['pred_cam'],
+                             orig_cam=smpl_in[cam_name]['orig_cam'],
                              pose=smpl_in[cam_name]['pose'],
-                             shape=smpl_in[cam_name]['betas'])
+                             betas=smpl_in[cam_name]['betas'],
+                             joints3d=smpl_in[cam_name]['joints3d'],
+                             n_joints2d=smpl_in[cam_name]['n_joints2d'],
+                             rotmat=smpl_in[cam_name]['rotmat'],
+                             bboxes=smpl_in[cam_name]['bboxes'],
+                             frame_paths=smpl_in[cam_name]['frame_paths'],
+                             verts=smpl_in[cam_name]['verts'])
                 else:
                     np.savez(result_path,
                              avatar_cam=smpl_in[cam_name]['avatar_cam'],
@@ -189,13 +196,15 @@ def main():
                         help='format for packing the resultr: LWGAN or DEBUG')
     parser.add_argument('--trim_frames', action="store_true", default=True,
                         help='trim excess frames to synch different cameras')
-
+    parser.add_argument('--pose_by_rotmat', action="store_true",
+                        help='fix a pose by rotmat')
     args = parser.parse_args()
 
     args.include_vertices = True
-    # args.output_format = 'LWGAN'
-    args.smpl_dir = 'smpl_debug'
-    args.result_dir = 'smpl_debug_aligned'
+    args.output_format = 'LWGAN'
+    args.smpl_dir = 'smpls_by_vibe'
+    args.result_dir = 'smpls_by_vibe_aligned_lwgan_fix'
+    args.pose_by_rotmat = True
 
     align_smpl(args)
 

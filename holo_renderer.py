@@ -6,6 +6,8 @@ import numpy as np
 from holo.data_struct import DataStruct
 from lib.utils.renderer import Renderer
 import colorsys
+from lib.models.spin import SMPL
+import torch
 
 
 def render_smpl(args):
@@ -25,7 +27,7 @@ def render_smpl(args):
     if frames_dir is not None:
         frames_dir = os.path.join(root_dir, frames_dir)
     smpl_dir = os.path.join(root_dir, smpl_dir)
-    data_smpl = DataStruct().parse(smpl_dir, levels='subject/light/garment/scene/cam', ext=format)
+    data_smpl = DataStruct().parse(smpl_dir, levels=args.data_levels, ext=format)
 
     # Init renderer:
     renderer = Renderer(resolution=(width, height), orig_img=True, wireframe=True, gender=gender)
@@ -39,11 +41,13 @@ def render_smpl(args):
                 continue
         print ('Processing dir', path)
 
+        # Parse smpl:
         smpl_path = [smpl.abs_path for smpl in data_smpl.items(node)][0]
         if format == 'pkl':
             vibe_result = joblib.load(smpl_path, 'r')
         elif format == 'npz':
-            vibe_result = np.load(smpl_path, encoding='latin1', allow_pickle=True)
+            with np.load(smpl_path, encoding='latin1', allow_pickle=True) as data:
+                vibe_result = dict(data)
         else:
             raise NotImplementedError
 
@@ -51,10 +55,26 @@ def render_smpl(args):
         if args.max_frames > 0:
             n = min(n, args.max_frames)
 
+        # Predict vertices if they are missed:
+        if not 'verts' in vibe_result or args.recalc_verts:
+            print ('Recalculating vertices...')
+            device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+            smpl_model = SMPL(args.vibe_model_dir, batch_size=n, create_transl=False, gender=args.gender)
+            smpl_model.to(device)
+            betas = torch.from_numpy(vibe_result['betas']).to(device)
+            rotmat = torch.from_numpy(vibe_result['rotmat']).to(device)
+            pred_output = smpl_model(betas=betas,
+                                     body_pose=rotmat[:, 1:],
+                                     global_orient=rotmat[:, 0].unsqueeze(1),
+                                     pose2rot=False)
+            vibe_result['verts'] = pred_output.vertices.detach().cpu().numpy()
+
+        # Make the result dir:
         result_dir = os.path.join(output_dir,path)
         if not os.path.exists(result_dir):
             os.makedirs(result_dir)
 
+        # Rendering:
         for idx in range(n):
             if frames_dir is not None:
                 img_path = os.path.join(frames_dir, vibe_result['frame_paths'][idx])
@@ -92,8 +112,14 @@ def main():
                         help='width of the result image')
     parser.add_argument('--height', type=int, default=1080,
                         help='height of the result image')
+    parser.add_argument('--data_levels', type=str, default='subject/light/garment/scene/cam',
+                        help='data levels for DataStruct')
     parser.add_argument('--gender', type=str, default='male',
                         help='gender of smpl for rendering')
+    parser.add_argument('--vibe_model_dir', type=str, default='data/vibe_data',
+                        help='smpl model dir for VIBE')
+    parser.add_argument('--recalc_verts', action="store_true",
+                        help='recalculate vertices from smpl betas')
     parser.add_argument('--max_frames', type=int, default=-1,
                         help='max number of frames for rendering')
     parser.add_argument('--input_format', type=str, default='npz',
@@ -104,15 +130,24 @@ def main():
                         help='render a target person only')
     args = parser.parse_args()
 
-    args.smpl_dir = 'smpl_debug_aligned'
-    args.output_dir = 'rendered_smpl_debug_aligned'
+    # HoloVideo:
+    # args.smpl_dir = 'smpls_by_vibe'
+    # args.output_dir = 'rendered_smpl_debug_aligned2'
+    # args.cam = 'avatar_cam'
+    # args.frames_dir = 'avatars'
+    # args.width = 256
+    # args.height = 256
+    # args.recalc_verts = True
+
+    # iPER:
+    args.root_dir = '/home/darkalert/KazendiJob/Data/iPER/Data'
+    args.data_levels = 'subject/garment/cam'
+    args.smpl_dir = 'smpls_by_vibe'
+    args.output_dir = 'rendered_smpl_by_vibe'
     args.cam = 'avatar_cam'
     args.frames_dir = 'avatars'
     args.width = 256
     args.height = 256
-    # args.max_frames = 25
-    # args.person = 'person_2'
-    # args.input_format = 'pkl'
 
     render_smpl(args)
 
