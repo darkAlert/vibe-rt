@@ -7,11 +7,11 @@ import joblib
 import argparse
 import numpy as np
 from torch.utils.data import DataLoader
-from lib.models.vibe import VIBE_Demo
-from lib.dataset.inference import HoloInference
-from lib.utils.demo_utils import convert_crop_cam_to_orig_img
-from holo.data_struct import DataStruct
-from lib.utils.renderer import Renderer
+from vibert.lib.models.vibe import VIBE_Demo
+from vibert.lib.dataset.inference import HoloInference
+from vibert.lib.utils.demo_utils import convert_crop_cam_to_orig_img
+from vibert.holo.data_struct import DataStruct
+from vibert.lib.utils.renderer import Renderer
 import colorsys
 
 
@@ -173,9 +173,9 @@ def main():
                         help='number of workers for dataloader')
     parser.add_argument('--vibe_batch_size', type=int, default=64,
                         help='batch size of VIBE')
-    parser.add_argument('--vibe_model_path', type=str, default='data/vibe_data/vibe_model_wo_3dpw.pth.tar',
+    parser.add_argument('--vibe_model_path', type=str, default='vibert/data/vibe_data/vibe_model_wo_3dpw.pth.tar',
                         help='path to pretrained VIBE model')
-    parser.add_argument('--bbox_scale', type=int, default=1.1,
+    parser.add_argument('--bbox_scale', type=float, default=1.1,
                         help='scale for bounding boxes')
     parser.add_argument('--gpu_id', type=str, default='0',
                         help='gpu id')

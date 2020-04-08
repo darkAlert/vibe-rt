@@ -2,7 +2,7 @@
 # sequences inputs.
 
 import torch
-from lib.models.spin import JOINT_IDS, perspective_projection
+from vibert.lib.models.spin import JOINT_IDS, perspective_projection
 
 
 def gmof(x, sigma):

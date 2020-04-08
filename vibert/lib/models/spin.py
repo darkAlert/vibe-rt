@@ -11,7 +11,7 @@ from smplx.lbs import vertices2joints
 from smplx.body_models import ModelOutput
 import torchvision.models.resnet as resnet
 
-from lib.utils.geometry import rotation_matrix_to_angle_axis
+from vibert.lib.utils.geometry import rotation_matrix_to_angle_axis
 
 # Map joints to SMPL joints
 JOINT_MAP = {
@@ -57,15 +57,19 @@ JOINT_NAMES = [
 # Dict containing the joints in numerical order
 JOINT_IDS = {JOINT_NAMES[i]: i for i in range(len(JOINT_NAMES))}
 
-JOINT_REGRESSOR_TRAIN_EXTRA = 'data/vibe_data/J_regressor_extra.npy'
-SMPL_MEAN_PARAMS = 'data/vibe_data/smpl_mean_params.npz'
-SMPL_MODEL_DIR = 'data/vibe_data'
+SMPL_MODEL_DIR = 'vibert/data/vibe_data'
+JOINT_REGRESSOR_TRAIN_EXTRA = 'vibert/data/vibe_data/J_regressor_extra.npy'
+SMPL_MEAN_PARAMS = 'vibert/data/vibe_data/smpl_mean_params.npz'
 H36M_TO_J17 = [6, 5, 4, 1, 2, 3, 16, 15, 14, 11, 12, 13, 8, 10, 0, 7, 9]
 H36M_TO_J14 = H36M_TO_J17[:14]
 
 
-def get_smpl_faces(gender='neutral'):
-    smpl = SMPL(SMPL_MODEL_DIR, gender=gender, batch_size=1, create_transl=False)
+def get_smpl_faces(gender='neutral', smpl_model_dir=None):
+    if smpl_model_dir is None:
+        smpl_model_dir = SMPL_MODEL_DIR
+
+    smpl = SMPL(smpl_model_dir, gender=gender, batch_size=1, create_transl=False)
+
     return smpl.faces
 
 def rot6d_to_rotmat_spin(x):
@@ -154,7 +158,7 @@ class HMR(nn.Module):
     """
     SMPL Iterative Regressor with ResNet50 backbone
     """
-    def __init__(self, block, layers, smpl_mean_params):
+    def __init__(self, block, layers, smpl_mean_path=None, smpl_model_dir=None, joint_regressor_path=None):
         self.inplanes = 64
         super(HMR, self).__init__()
         npose = 24 * 6
@@ -179,10 +183,16 @@ class HMR(nn.Module):
         nn.init.xavier_uniform_(self.decshape.weight, gain=0.01)
         nn.init.xavier_uniform_(self.deccam.weight, gain=0.01)
 
+        if smpl_mean_path is None:
+            smpl_mean_path = SMPL_MEAN_PARAMS
+        if smpl_model_dir is None:
+            smpl_model_dir = SMPL_MODEL_DIR
+
         self.smpl = SMPL(
-            SMPL_MODEL_DIR,
+            smpl_model_dir,
             batch_size=64,
-            create_transl=False
+            create_transl=False,
+            joint_regressor_path=joint_regressor_path
         ).to('cpu')
 
         for m in self.modules():
@@ -193,7 +203,7 @@ class HMR(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-        mean_params = np.load(smpl_mean_params)
+        mean_params = np.load(smpl_mean_path)
         init_pose = torch.from_numpy(mean_params['pose'][:]).unsqueeze(0)
         init_shape = torch.from_numpy(mean_params['shape'][:].astype('float32')).unsqueeze(0)
         init_cam = torch.from_numpy(mean_params['cam']).unsqueeze(0)
@@ -301,7 +311,7 @@ class HMR(nn.Module):
 
 
 class Regressor(nn.Module):
-    def __init__(self, use_6d=True, smpl_mean_params='data/vibe_data/smpl_mean_params.npz'):
+    def __init__(self, use_6d=True, smpl_mean_path=None, smpl_model_dir=None, joint_regressor_path=None):
         super(Regressor, self).__init__()
 
         self.use_6d = use_6d
@@ -318,14 +328,22 @@ class Regressor(nn.Module):
         nn.init.xavier_uniform_(self.decshape.weight, gain=0.01)
         nn.init.xavier_uniform_(self.deccam.weight, gain=0.01)
 
+        if smpl_mean_path is None:
+            smpl_mean_path = SMPL_MEAN_PARAMS
+        if smpl_model_dir is None:
+            smpl_model_dir = SMPL_MODEL_DIR
+        if joint_regressor_path is None:
+            joint_regressor_path = JOINT_REGRESSOR_TRAIN_EXTRA
+
         self.smpl = SMPL(
-            SMPL_MODEL_DIR,
+            model_path=smpl_model_dir,
             batch_size=64,
-            create_transl=False
+            create_transl=False,
+            joint_regressor_path=joint_regressor_path
         )
 
         if use_6d:
-            mean_params = np.load(smpl_mean_params)
+            mean_params = np.load(smpl_mean_path)
             init_pose = torch.from_numpy(mean_params['pose'][:]).unsqueeze(0)
             init_shape = torch.from_numpy(mean_params['shape'][:].astype('float32')).unsqueeze(0)
             init_cam = torch.from_numpy(mean_params['cam']).unsqueeze(0)
@@ -423,13 +441,14 @@ class Regressor(nn.Module):
         return output
 
 
-def hmr(smpl_mean_params='data/vibe_data/smpl_mean_params.npz', pretrained=True, **kwargs):
+def hmr(pretrained=True, **kwargs):
     """
     Constructs an HMR model with ResNet50 backbone.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    model = HMR(Bottleneck, [3, 4, 6, 3], smpl_mean_params, **kwargs)
+
+    model = HMR(Bottleneck, [3, 4, 6, 3], **kwargs)
     if pretrained:
         resnet_imagenet = resnet.resnet50(pretrained=True)
         model.load_state_dict(resnet_imagenet.state_dict(), strict=False)
@@ -489,7 +508,13 @@ class SMPL(_SMPL):
     def __init__(self, *args, **kwargs):
         super(SMPL, self).__init__(*args, **kwargs)
         joints = [JOINT_MAP[i] for i in JOINT_NAMES]
-        J_regressor_extra = np.load(JOINT_REGRESSOR_TRAIN_EXTRA)
+
+        if 'joint_regressor_path' in kwargs:
+            j_regressor_path = kwargs['joint_regressor_path']
+        else:
+            j_regressor_path = JOINT_REGRESSOR_TRAIN_EXTRA
+
+        J_regressor_extra = np.load(j_regressor_path)
         self.register_buffer('J_regressor_extra', torch.tensor(J_regressor_extra, dtype=torch.float32))
         self.joint_map = torch.tensor(joints, dtype=torch.long)
 
@@ -511,7 +536,7 @@ class SMPL(_SMPL):
 def get_pretrained_hmr():
     device = 'cuda'
     model = hmr().to(device)
-    checkpoint = torch.load('data/vibe_data/spin_model_checkpoint.pth.tar')
+    checkpoint = torch.load('vibert/data/vibe_data/spin_model_checkpoint.pth.tar')
     model.load_state_dict(checkpoint['model'], strict=False)
     model.eval()
     return model

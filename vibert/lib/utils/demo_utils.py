@@ -25,10 +25,10 @@ import os.path as osp
 from pytube import YouTube
 from collections import OrderedDict
 
-from lib.utils.smooth_bbox import get_smooth_bbox_params, get_all_bbox_params
-from lib.data_utils.img_utils import get_single_image_crop_demo
-from lib.utils.geometry import rotation_matrix_to_angle_axis
-from lib.smplify.temporal_smplify import TemporalSMPLify
+from vibert.lib.utils.smooth_bbox import get_smooth_bbox_params, get_all_bbox_params
+from vibert.lib.data_utils.img_utils import get_single_image_crop_demo
+from vibert.lib.utils.geometry import rotation_matrix_to_angle_axis
+from vibert.lib.smplify.temporal_smplify import TemporalSMPLify
 
 
 def preprocess_video(video, joints2d, bboxes, frames, scale=1.0, crop_size=224):
@@ -218,16 +218,16 @@ def download_url(url, outdir):
     subprocess.call(cmd)
 
 
-def download_ckpt(outdir='data/vibe_data', use_3dpw=False):
+def download_ckpt(outdir='vibert/data/vibe_data', use_3dpw=False):
     os.makedirs(outdir, exist_ok=True)
 
     if use_3dpw:
-        ckpt_file = 'data/vibe_data/vibe_model_w_3dpw.pth.tar'
+        ckpt_file = 'vibert/data/vibe_data/vibe_model_w_3dpw.pth.tar'
         url = 'https://www.dropbox.com/s/41ozgqorcp095ja/vibe_model_w_3dpw.pth.tar'
         if not os.path.isfile(ckpt_file):
             download_url(url=url, outdir=outdir)
     else:
-        ckpt_file = 'data/vibe_data/vibe_model_wo_3dpw.pth.tar'
+        ckpt_file = 'vibert/data/vibe_data/vibe_model_wo_3dpw.pth.tar'
         url = 'https://www.dropbox.com/s/amj2p8bmf6g56k6/vibe_model_wo_3dpw.pth.tar'
         if not os.path.isfile(ckpt_file):
             download_url(url=url, outdir=outdir)

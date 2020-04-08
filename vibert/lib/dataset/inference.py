@@ -21,8 +21,8 @@ import os.path as osp
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import to_tensor
 
-from lib.utils.smooth_bbox import get_all_bbox_params
-from lib.data_utils.img_utils import get_single_image_crop_demo
+from vibert.lib.utils.smooth_bbox import get_all_bbox_params
+from vibert.lib.data_utils.img_utils import get_single_image_crop_demo
 
 
 class HoloInference(Dataset):

@@ -19,8 +19,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from lib.models.spin import Regressor, hmr
-from lib.models.attention import SelfAttention
+from vibert.lib.models.spin import Regressor, hmr
+from vibert.lib.models.attention import SelfAttention
+
+VIBE_PRETRAINED_PATH = 'vibert/data/vibe_data/spin_model_checkpoint.pth.tar'
 
 
 class TemporalEncoder(nn.Module):
@@ -116,7 +118,7 @@ class VIBE(nn.Module):
             batch_size=64,
             n_layers=1,
             hidden_size=2048,
-            pretrained='data/vibe_data/spin_model_checkpoint.pth.tar',
+            pretrained=None,
             add_linear=False,
             bidirectional=False,
             attention=False,
@@ -155,6 +157,9 @@ class VIBE(nn.Module):
         # regressor can predict cam, pose and shape params in an iterative way
         self.regressor = Regressor(use_6d=use_6d)
 
+        if pretrained is None:
+            pretrained = VIBE_PRETRAINED_PATH
+
         if pretrained and os.path.isfile(pretrained):
             pretrained_dict = torch.load(pretrained)['model']
 
@@ -189,14 +194,18 @@ class VIBE(nn.Module):
 
         return smpl_output
 
+
 class VibeRT(nn.Module):
     def __init__(
             self,
             seqlen,
+            smpl_model_dir,
+            smpl_mean_path,
+            joint_regressor_path,
             batch_size=64,
             n_layers=1,
             hidden_size=2048,
-            pretrained='data/vibe_data/spin_model_checkpoint.pth.tar',
+            pretrained=None,
             add_linear=False,
             bidirectional=False,
             attention=False,
@@ -204,6 +213,7 @@ class VibeRT(nn.Module):
             use_residual=True,
             use_6d=True,
             disable_temporal=False
+
     ):
 
         super(VibeRT, self).__init__()
@@ -232,12 +242,20 @@ class VibeRT(nn.Module):
                 use_residual=use_residual,
             )
 
-        self.hmr = hmr()
+        if pretrained is None:
+            pretrained = VIBE_PRETRAINED_PATH
+
+        self.hmr = hmr(smpl_model_dir=smpl_model_dir,
+                       smpl_mean_path=smpl_mean_path,
+                       joint_regressor_path=joint_regressor_path)
         checkpoint = torch.load(pretrained)
         self.hmr.load_state_dict(checkpoint['model'], strict=False)
 
         # regressor can predict cam, pose and shape params in an iterative way
-        self.regressor = Regressor(use_6d=use_6d)
+        self.regressor = Regressor(use_6d=use_6d,
+                                   smpl_model_dir=smpl_model_dir,
+                                   smpl_mean_path=smpl_mean_path,
+                                   joint_regressor_path=joint_regressor_path)
 
         if pretrained and os.path.isfile(pretrained):
             pretrained_dict = torch.load(pretrained)['model']

@@ -3,10 +3,10 @@ import cv2
 import joblib
 import argparse
 import numpy as np
-from holo.data_struct import DataStruct
-from lib.utils.renderer import Renderer
+from vibert.holo.data_struct import DataStruct
+from vibert.lib.utils.renderer import Renderer
 import colorsys
-from lib.models.spin import SMPL
+from vibert.lib.models.spin import SMPL
 import torch
 
 
@@ -38,6 +38,9 @@ def render_smpl(args):
         if args.person is not None:
             person = path.split('/')[0]
             if person != args.person:
+                continue
+        if args.filter_by_path is not None:
+            if path != args.filter_by_path:
                 continue
         print ('Processing dir', path)
 
@@ -116,7 +119,7 @@ def main():
                         help='data levels for DataStruct')
     parser.add_argument('--gender', type=str, default='male',
                         help='gender of smpl for rendering')
-    parser.add_argument('--vibe_model_dir', type=str, default='data/vibe_data',
+    parser.add_argument('--vibe_model_dir', type=str, default='vibert/data/vibe_data',
                         help='smpl model dir for VIBE')
     parser.add_argument('--recalc_verts', action="store_true",
                         help='recalculate vertices from smpl betas')
@@ -128,6 +131,8 @@ def main():
                         help='cam for rendering: orig_cam, pred_cam or avatar_cam')
     parser.add_argument('--person', type=str, default=None,
                         help='render a target person only')
+    parser.add_argument('--filter_by_path', type=str, default=None,
+                        help='filter data by given path')
     args = parser.parse_args()
 
     # HoloVideo:
@@ -139,15 +144,27 @@ def main():
     # args.height = 256
     # args.recalc_verts = True
 
-    # iPER:
-    args.root_dir = '/home/darkalert/KazendiJob/Data/iPER/Data'
-    args.data_levels = 'subject/garment/cam'
+    # # iPER:
+    # args.root_dir = '/home/darkalert/KazendiJob/Data/iPER/Data'
+    # args.data_levels = 'subject/garment/cam'
+    # args.smpl_dir = 'smpls_by_vibe'
+    # args.output_dir = 'rendered_smpl_by_vibe'
+    # args.cam = 'avatar_cam'
+    # args.frames_dir = 'avatars'
+    # args.width = 256
+    # args.height = 256
+
+    # VIBE-RT:
+    args.root_dir = '/home/darkalert/KazendiJob/Data/HoloVideo/Data'
+    # args.smpl_dir = 'smpls_by_vibe-rt'
+    # args.output_dir = 'rendered_smpl_by_vibe-rt'
     args.smpl_dir = 'smpls_by_vibe'
     args.output_dir = 'rendered_smpl_by_vibe'
     args.cam = 'avatar_cam'
     args.frames_dir = 'avatars'
     args.width = 256
     args.height = 256
+    args.filter_by_path = 'person_2/light-100_temp-5600/garments_2/front_position/cam1'
 
     render_smpl(args)
 

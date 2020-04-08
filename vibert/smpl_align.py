@@ -15,7 +15,7 @@ import numpy as np
 import torch
 
 SMOOTHING_WINDOW = None
-SMPL_MODEL_DIR = 'data/vibe_data'
+SMPL_MODEL_DIR = 'vibert/data/vibe_data'
 
 def distance(x1, y1, x2, y2):
     l = np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))

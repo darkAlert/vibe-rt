@@ -186,7 +186,7 @@ def main():
                         help='dir containing input smpl pkls')
     parser.add_argument('--result_dir', type=str, default='smpl_maskrcnn_aligned',
                         help='dir that will contain the result of smpl alignment')
-    parser.add_argument('--vibe_model_dir', type=str, default='data/vibe_data',
+    parser.add_argument('--vibe_model_dir', type=str, default='vibert/data/vibe_data',
                         help='smpl model dir for VIBE')
     parser.add_argument('--gender', type=str, default='neutral',
                         help='gender of smpl for rendering')

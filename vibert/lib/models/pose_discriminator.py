@@ -6,8 +6,8 @@ import numpy as np
 import torch.nn as nn
 import sys
 
-from lib.models.linear_model import LinearModel
-from lib.utils.geometry import batch_rodrigues
+from vibert.lib.models.linear_model import LinearModel
+from vibert.lib.utils.geometry import batch_rodrigues
 from torch.nn.utils import spectral_norm
 
 class ShapeDiscriminator(LinearModel):

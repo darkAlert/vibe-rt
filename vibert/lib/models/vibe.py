@@ -19,8 +19,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from lib.models.spin import Regressor, hmr
-from lib.models.attention import SelfAttention
+from vibert.lib.models.spin import Regressor, hmr
+from vibert.lib.models.attention import SelfAttention
 
 
 class TemporalEncoder(nn.Module):
@@ -116,7 +116,7 @@ class VIBE(nn.Module):
             batch_size=64,
             n_layers=1,
             hidden_size=2048,
-            pretrained='data/vibe_data/spin_model_checkpoint.pth.tar',
+            pretrained='vibert/data/vibe_data/spin_model_checkpoint.pth.tar',
             add_linear=False,
             bidirectional=False,
             attention=False,
@@ -196,7 +196,7 @@ class VIBE_Demo(nn.Module):
             batch_size=64,
             n_layers=1,
             hidden_size=2048,
-            pretrained='data/vibe_data/spin_model_checkpoint.pth.tar',
+            pretrained='vibert/data/vibe_data/spin_model_checkpoint.pth.tar',
             add_linear=False,
             bidirectional=False,
             attention=False,
