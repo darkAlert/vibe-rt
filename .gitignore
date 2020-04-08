@@ -1,0 +1,9 @@
+.idea
+*.pyc
+*.zip
+*.pth
+*.tar
+*.weights
+*build
+*dist
+*vibert.egg-info
