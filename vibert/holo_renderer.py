@@ -156,10 +156,10 @@ def main():
 
     # VIBE-RT:
     args.root_dir = '/home/darkalert/KazendiJob/Data/HoloVideo/Data'
-    # args.smpl_dir = 'smpls_by_vibe-rt'
-    # args.output_dir = 'rendered_smpl_by_vibe-rt'
-    args.smpl_dir = 'smpls_by_vibe'
-    args.output_dir = 'rendered_smpl_by_vibe'
+    args.smpl_dir = 'smpls_by_vibe-rt'
+    args.output_dir = 'rendered_smpl_by_vibe-rt'
+    # args.smpl_dir = 'smpls_by_vibe'
+    # args.output_dir = 'rendered_smpl_by_vibe'
     args.cam = 'avatar_cam'
     args.frames_dir = 'avatars'
     args.width = 256
