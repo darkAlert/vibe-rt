@@ -245,7 +245,8 @@ class VibeRT(nn.Module):
         if pretrained is None:
             pretrained = VIBE_PRETRAINED_PATH
 
-        self.hmr = hmr(smpl_model_dir=smpl_model_dir,
+        self.hmr = hmr(pretrained=False,
+                       smpl_model_dir=smpl_model_dir,
                        smpl_mean_path=smpl_mean_path,
                        joint_regressor_path=joint_regressor_path)
         checkpoint = torch.load(pretrained)
