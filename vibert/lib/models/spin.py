@@ -449,9 +449,11 @@ def hmr(pretrained=True, **kwargs):
     """
 
     model = HMR(Bottleneck, [3, 4, 6, 3], **kwargs)
+
     if pretrained:
         resnet_imagenet = resnet.resnet50(pretrained=True)
         model.load_state_dict(resnet_imagenet.state_dict(), strict=False)
+
     return model
 
 
@@ -535,7 +537,7 @@ class SMPL(_SMPL):
 
 def get_pretrained_hmr():
     device = 'cuda'
-    model = hmr().to(device)
+    model = hmr(pretrained=False).to(device)
     checkpoint = torch.load('vibert/data/vibe_data/spin_model_checkpoint.pth.tar')
     model.load_state_dict(checkpoint['model'], strict=False)
     model.eval()
