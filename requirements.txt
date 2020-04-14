@@ -4,3 +4,4 @@ scipy
 scikit-image
 scikit-video
 smplx
+chumpy
