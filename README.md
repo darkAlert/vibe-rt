@@ -31,6 +31,7 @@ This implementation:
 - is fast, up-to 30 FPS on a RTX2080Ti (see [this table](doc/demo.md#runtime-performance)),
 - achieves SOTA results on 3DPW and MPI-INF-3DHP datasets,
 - includes Temporal SMPLify implementation.
+- adapted for Real-Time inference
 
 <p float="center">
   <img src="https://s5.gifyu.com/images/method_v2.gif" width="49%" />
