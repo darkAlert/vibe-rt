@@ -48,10 +48,10 @@ class WeakPerspectiveCamera(pyrender.Camera):
 
 
 class Renderer():
-    def __init__(self, resolution=(224,224), orig_img=False, wireframe=False, gender='neutral'):
+    def __init__(self, resolution=(224,224), orig_img=False, wireframe=False, gender='neutral', smpl_model_dir=None):
         self.resolution = resolution
 
-        self.faces = get_smpl_faces(gender)
+        self.faces = get_smpl_faces(gender, smpl_model_dir=smpl_model_dir)
         self.orig_img = orig_img
         self.wireframe = wireframe
         self.renderer = pyrender.OffscreenRenderer(
