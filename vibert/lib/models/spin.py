@@ -64,11 +64,12 @@ H36M_TO_J17 = [6, 5, 4, 1, 2, 3, 16, 15, 14, 11, 12, 13, 8, 10, 0, 7, 9]
 H36M_TO_J14 = H36M_TO_J17[:14]
 
 
-def get_smpl_faces(gender='neutral', smpl_model_dir=None):
+def get_smpl_faces(gender='neutral', smpl_model_dir=None, joint_regressor_path=None):
     if smpl_model_dir is None:
         smpl_model_dir = SMPL_MODEL_DIR
 
-    smpl = SMPL(smpl_model_dir, gender=gender, batch_size=1, create_transl=False)
+    smpl = SMPL(smpl_model_dir, gender=gender, batch_size=1,
+                create_transl=False, joint_regressor_path=joint_regressor_path)
 
     return smpl.faces
 
@@ -511,9 +512,10 @@ class SMPL(_SMPL):
         super(SMPL, self).__init__(*args, **kwargs)
         joints = [JOINT_MAP[i] for i in JOINT_NAMES]
 
+        j_regressor_path = None
         if 'joint_regressor_path' in kwargs:
             j_regressor_path = kwargs['joint_regressor_path']
-        else:
+        if j_regressor_path is None:
             j_regressor_path = JOINT_REGRESSOR_TRAIN_EXTRA
 
         J_regressor_extra = np.load(j_regressor_path)
