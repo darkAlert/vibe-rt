@@ -30,7 +30,7 @@ def predict_smpl(args, debug_render=False):
     # Init VIBE model:
     assert os.path.exists(args.vibe_model_path)
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    vibe_model = VIBE_Demo(seqlen=16, n_layers=2, hidden_size=1024, add_linear=True, use_residual=True).to(device)
+    vibe_model = VIBE_Demo(seqlen=args.vibe_seqlen, n_layers=2, hidden_size=1024, add_linear=True, use_residual=True).to(device)
     ckpt = torch.load(args.vibe_model_path)
     vibe_model.load_state_dict(ckpt['gen_state_dict'], strict=False)
     vibe_model.eval()
@@ -173,6 +173,8 @@ def main():
                         help='number of workers for dataloader')
     parser.add_argument('--vibe_batch_size', type=int, default=64,
                         help='batch size of VIBE')
+    parser.add_argument('--vibe_seqlen', type=int, default=16,
+                        help='sequence length of VIBE')
     parser.add_argument('--vibe_model_path', type=str, default='vibert/data/vibe_data/vibe_model_wo_3dpw.pth.tar',
                         help='path to pretrained VIBE model')
     parser.add_argument('--bbox_scale', type=float, default=1.1,
@@ -194,10 +196,12 @@ def main():
         args.frames_dir = 'frames'
         # args.bboxes_dir = 'bboxes'
         args.bboxes_dir = 'bboxes_by_maskrcnn'
-        args.output_dir = 'smpl' if args.bboxes_dir == 'bboxes' else 'smpl_maskrcnn2'
+        args.output_dir = 'smpl' if args.bboxes_dir == 'bboxes' else 'smpl_maskrcnn2_seqlen1'
         args.bbox_scale = 1.0 if args.bboxes_dir == 'bboxes' else 1.1
         args.filter_by_path = 'person_2/light-100_temp-5600/garments_2/front_position'
         args.add_verts=True
+        args.vibe_batch_size = 1
+        args.vibe_seqlen = 1
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
     print('persons:', args.persons, ', gpu_id:', args.gpu_id, ', root_dir:', args.root_dir)

@@ -263,7 +263,6 @@ class VIBE_Demo(nn.Module):
             feature = self.encoder(feature)
             feature = feature.reshape(-1, feature.size(-1))
 
-
         smpl_output = self.regressor(feature, J_regressor=J_regressor)
 
         for s in smpl_output:

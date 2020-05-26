@@ -43,6 +43,8 @@ def render_smpl(args):
             if path != args.filter_by_path:
                 continue
         print ('Processing dir', path)
+        for smpl in data_smpl.items(node):
+            print (smpl.abs_path)
 
         # Parse smpl:
         smpl_path = [smpl.abs_path for smpl in data_smpl.items(node)][0]
@@ -156,15 +158,16 @@ def main():
 
     # VIBE-RT:
     args.root_dir = '/home/darkalert/KazendiJob/Data/HoloVideo/Data'
-    args.smpl_dir = 'smpls_by_vibe-rt'
-    args.output_dir = 'rendered_smpl_by_vibe-rt'
+    args.smpl_dir = 'smpl_maskrcnn2_seqlen1'
+    args.output_dir = 'rendered_smpl_test_seqlen1'
     # args.smpl_dir = 'smpls_by_vibe'
     # args.output_dir = 'rendered_smpl_by_vibe'
-    args.cam = 'avatar_cam'
-    args.frames_dir = 'avatars'
-    args.width = 256
-    args.height = 256
+    args.cam = 'orig_cam'
+    args.frames_dir = 'frames'
+    args.width = 1920
+    args.height = 1080
     args.filter_by_path = 'person_2/light-100_temp-5600/garments_2/front_position/cam1'
+    args.input_format = 'pkl'
 
     render_smpl(args)
 
